@@ -1,0 +1,104 @@
+name: Package Windows preview installer
+
+on:
+  push:
+    branches:
+      - test/multitab-preview-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package-installer:
+    name: Package standalone Windows installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download the already-built Windows app
+        uses: actions/download-artifact@v4
+        with:
+          name: otzaria-windows-debug
+          path: preview-build
+          repository: ${{ github.repository }}
+          run-id: 40134992434
+          github-token: ${{ github.token }}
+
+      - name: Create installer script
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'preview-build\\otzaria.exe'
+          if (-not (Test-Path $exe)) {
+            Get-ChildItem preview-build -Recurse | Select-Object -ExpandProperty FullName
+            throw 'otzaria.exe was not found in the downloaded Windows build'
+          }
+
+          $buildDir = (Join-Path $env:GITHUB_WORKSPACE 'preview-build').Replace('\\', '\\\\')
+          $iss = @"
+          [Setup]
+          AppId={{7F80E4D0-9F1D-4B1C-A4C8-333A5E01B72F}}
+          AppName=Otzaria MultiTab Preview
+          AppVersion=0.9.98
+          DefaultDirName={localappdata}\\Programs\\Otzaria MultiTab Preview
+          DefaultGroupName=Otzaria MultiTab Preview
+          DisableProgramGroupPage=yes
+          OutputDir=installer-output
+          OutputBaseFilename=otzaria-multitab-preview-setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64
+          ArchitecturesInstallIn64BitMode=x64
+          PrivilegesRequired=lowest
+          UninstallDisplayIcon={app}\\otzaria.exe
+
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
+
+          [Files]
+          Source: "$buildDir\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+
+          [Icons]
+          Name: "{autoprograms}\\Otzaria MultiTab Preview"; Filename: "{app}\\otzaria.exe"
+          Name: "{autodesktop}\\Otzaria MultiTab Preview"; Filename: "{app}\\otzaria.exe"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\\otzaria.exe"; Description: "Launch Otzaria MultiTab Preview"; Flags: postinstall nowait skipifsilent
+          "@
+
+          Set-Content -Path (Join-Path $env:GITHUB_WORKSPACE 'preview-installer.iss') -Value $iss -Encoding ASCII
+
+      - name: Install Inno Setup if missing
+        shell: pwsh
+        run: |
+          $paths = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\\ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\\ISCC.exe')
+          )
+          $iscc = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to install Inno Setup' }
+          }
+
+      - name: Build standalone installer
+        shell: pwsh
+        run: |
+          $paths = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\\ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\\ISCC.exe')
+          )
+          $iscc = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw 'ISCC.exe not found' }
+          & $iscc (Join-Path $env:GITHUB_WORKSPACE 'preview-installer.iss')
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed: $LASTEXITCODE" }
+
+      - name: Upload standalone installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: otzaria-windows-installer-exe
+          path: installer-output/otzaria-multitab-preview-setup.exe
+          if-no-files-found: error
+          retention-days: 7
