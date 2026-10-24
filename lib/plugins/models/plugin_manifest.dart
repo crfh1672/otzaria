@@ -38,6 +38,10 @@ class PluginManifest {
   final bool networkEnabled;
   final List<String> networkAllowlist;
   final String toolTabTitle;
+
+  /// האם מותר לתוסף לפתוח מופעים נוספים של עצמו בלשוניות נפרדות.
+  /// ברירת מחדל false כדי לשמור על התנהגות התוספים הקיימים.
+  final bool allowMultipleInstances;
   final int toolTabOrder;
   final bool defaultPinned;
 
@@ -80,6 +84,7 @@ class PluginManifest {
     required this.networkEnabled,
     required this.networkAllowlist,
     required this.toolTabTitle,
+    this.allowMultipleInstances = false,
     required this.toolTabOrder,
     required this.defaultPinned,
     this.toolTabIconName,
@@ -128,6 +133,7 @@ class PluginManifest {
               .toList() ??
           [],
       toolTabTitle: toolTab['title'] as String? ?? json['name'] as String,
+      allowMultipleInstances: toolTab['allowMultipleInstances'] as bool? ?? false,
       toolTabOrder: toolTab['order'] as int? ?? 900,
       defaultPinned: toolTab['defaultPinned'] as bool? ?? true,
       toolTabIconName: toolTab['iconName'] as String?,
@@ -172,6 +178,7 @@ class PluginManifest {
       'contributes': {
         'toolTab': {
           'title': toolTabTitle,
+          if (allowMultipleInstances) 'allowMultipleInstances': true,
           'order': toolTabOrder,
           'defaultPinned': defaultPinned,
           if (toolTabIconName != null) 'iconName': toolTabIconName,
