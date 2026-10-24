@@ -17,6 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:mockito/mockito.dart';
 import 'package:otzaria/book_protection/models/book_protection.dart';
 import 'package:otzaria/core/app_paths.dart';
+import 'package:otzaria/core/windowing/app_window_keys.dart';
 import 'package:otzaria/core/connectivity_status_service.dart';
 import 'package:otzaria/data/data_providers/book_composite_key.dart';
 import 'package:otzaria/data/data_providers/library_provider.dart';
@@ -306,6 +307,7 @@ InstalledPlugin _buildInstalledPlugin({
   bool networkEnabled = false,
   List<String> networkAllowlist = const [],
   String pluginId = 'test.plugin',
+  bool allowMultipleInstances = false,
 }) {
   return InstalledPlugin(
     pluginId: pluginId,
@@ -330,6 +332,7 @@ InstalledPlugin _buildInstalledPlugin({
       networkEnabled: networkEnabled,
       networkAllowlist: networkAllowlist,
       toolTabTitle: 'Test Plugin',
+      allowMultipleInstances: allowMultipleInstances,
       toolTabOrder: 1,
       defaultPinned: true,
       publishedDataTypes: const [],
@@ -4341,6 +4344,68 @@ Future<void> main() async {
 
       expect(result, isTrue);
       expect(navigations, ['test.plugin']);
+    });
+
+    test('plugin.openSelf newTab דורש opt-in ומנתב אירוע למופע חדש', () async {
+      final optedInAdapter = PluginBridgeAdapter(
+        _buildInstalledPlugin(
+          permissions: const ['navigation.write'],
+          allowMultipleInstances: true,
+        ),
+        dependencies: _buildNetworkDeps(),
+        pluginRepository: registry,
+      );
+
+      const newInstanceId = 'test.plugin.second';
+      String? openInstance(String pluginId) {
+        expect(pluginId, 'test.plugin');
+        return newInstanceId;
+      }
+
+      final keys = AppWindowKeys.current;
+      PluginPageLauncher.instance.registerInstanceOpener(keys, openInstance);
+      addTearDown(() {
+        PluginPageLauncher.instance.markPageClosed(
+          'test.plugin',
+          instanceId: newInstanceId,
+        );
+        PluginPageLauncher.instance.unregisterInstanceOpener(keys, openInstance);
+      });
+
+      final result = await optedInAdapter.execute('plugin', 'openSelf', {
+        'newTab': true,
+        'param': 'second',
+      });
+
+      expect(result, isTrue);
+      expect(PluginPageLauncher.instance.hasPendingFor('test.plugin'), isTrue);
+      PluginPageLauncher.instance.markPageClosed(
+        'test.plugin',
+        instanceId: newInstanceId,
+      );
+      expect(PluginPageLauncher.instance.hasPendingFor('test.plugin'), isFalse);
+    });
+
+    test('plugin.openSelf newTab נדחה ללא opt-in במניפסט', () async {
+      expect(
+        adapter.execute('plugin', 'openSelf', {'newTab': true}),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('error.forbidden'),
+          ),
+        ),
+      );
+    });
+
+    test('plugin.openSelf rejects a non-boolean newTab argument', () async {
+      expect(
+        adapter.execute('plugin', 'openSelf', {'newTab': 'true'}),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('error.invalid_params'),
+          ),
+        ),
+      );
     });
 
     test('plugin.openOther מנווט לתוסף היעד ומוסר לו openedBy', () async {
