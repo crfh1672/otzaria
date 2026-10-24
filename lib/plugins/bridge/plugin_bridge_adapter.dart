@@ -7348,6 +7348,27 @@ class PluginBridgeAdapter {
         }
         return true;
       case 'openSelf':
+        final newTab = args['newTab'];
+        if (newTab != null && newTab is! bool) {
+          throw Exception('error.invalid_params: newTab must be boolean');
+        }
+        if (newTab == true) {
+          if (!plugin.manifest.allowMultipleInstances) {
+            throw Exception(
+              'error.forbidden: contributes.toolTab.allowMultipleInstances '
+              'is not enabled in the manifest',
+            );
+          }
+          final openedInstanceId = PluginPageLauncher.instance.openNewInstance(
+            plugin.pluginId,
+            topic: 'plugin.page_opened',
+            payload: {'param': args['param']},
+            viewId: _windowDependencies.viewId,
+            windowKeys: _windowDependencies.windowKeys,
+          );
+          return openedInstanceId != null;
+        }
+
         PluginPageLauncher.instance.open(
           plugin.pluginId,
           topic: 'plugin.page_opened',

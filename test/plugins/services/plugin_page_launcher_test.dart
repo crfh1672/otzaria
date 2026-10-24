@@ -54,6 +54,54 @@ void main() {
 
   Future<void> pumpMicrotasks() => Future<void>.delayed(Duration.zero);
 
+  test('אירוע openSelf במופע חדש נמסר רק למופע החדש', () async {
+    final keys = AppWindowKeys();
+    final newController = _RecordingController();
+    const newInstanceId = 'launcher.test.plugin.second';
+    final windowNavigations = <String>[];
+
+    String? openInstance(String pluginId) {
+      expect(pluginId, _kPid);
+      return newInstanceId;
+    }
+
+    dispatcher.registerController(
+      _kPid,
+      newController,
+      instanceId: newInstanceId,
+      viewId: 2,
+    );
+    launcher.register(keys, windowNavigations.add);
+    launcher.registerInstanceOpener(keys, openInstance);
+    addTearDown(() {
+      launcher.markPageClosed(_kPid, instanceId: newInstanceId, viewId: 2);
+      dispatcher.unregisterController(_kPid, instanceId: newInstanceId);
+      launcher.unregisterInstanceOpener(keys, openInstance);
+      launcher.unregister(keys, windowNavigations.add);
+    });
+
+    final openedId = launcher.openNewInstance(
+      _kPid,
+      topic: 'plugin.page_opened',
+      payload: const {'param': 'new-instance'},
+      viewId: 2,
+      windowKeys: keys,
+    );
+
+    expect(openedId, newInstanceId);
+    expect(launcher.hasPendingFor(_kPid), isTrue);
+
+    launcher.markPageReady(_kPid, viewId: 1);
+    launcher.markPageReady(_kPid, instanceId: newInstanceId, viewId: 2);
+    await pumpMicrotasks();
+
+    expect(controller.jsCalls, isEmpty);
+    expect(newController.jsCalls, hasLength(1));
+    expect(newController.jsCalls.single, contains('plugin.page_opened'));
+    expect(newController.jsCalls.single, contains('"param":"new-instance"'));
+    expect(launcher.hasPendingFor(_kPid), isFalse);
+  });
+
   test(
     'דף מוכן בחלון אחר אינו גונב פתיחה שממתינה ל-boot בחלון המקור',
     () async {
