@@ -2771,19 +2771,30 @@ const { data } = await Otzaria.call('navigation.goTo', {
 ### `plugin.openSelf`
 **הרשאה:** `navigation.write` | **מגרסה:** 0.9.96
 
-מעביר את המשתמש לדף התוסף (מסך "כלים"), עם פרמטר אופציונלי שיימסר לתוסף.
+מעביר את המשתמש לדף התוסף, עם פרמטר אופציונלי שיימסר לתוסף.
 
-שימושי בעיקר מ-instance רקע (`background.html`): למשל, בתגובה ללחיצה על פריט
-תפריט הקשר או על התראה — פותחים את דף התוסף עם ההקשר הרלוונטי.
+`newTab: true` (מגרסה 0.9.99) מבקש לפתוח מופע נוסף של אותו תוסף בכרטיסייה
+עצמאית. האפשרות זמינה רק אם המניפסט מצהיר במפורש על
+`contributes.toolTab.allowMultipleInstances: true`. ללא `newTab`, או עם
+`newTab: false`, נשמרת ההתנהגות הקיימת — מיקוד המופע הרגיל של התוסף.
+מותר לפתוח עד שני מופעים של אותו תוסף בחלון.
 
 ```javascript
+// פתיחה רגילה, כמו בעבר:
 await Otzaria.call('plugin.openSelf', {
   param: { view: 'results', query: 'ויאמר' }  // כל ערך JSON (אופציונלי)
 });
-// true
+
+// פתיחת מופע נוסף (דורש minAppVersion: "0.9.99" ו-opt-in במניפסט):
+await Otzaria.call('plugin.openSelf', {
+  newTab: true,
+  param: { view: 'results', query: 'ויאמר' }
+});
+// true אם המופע החדש נפתח; false אם לא ניתן לפתוח אותו.
+// error.forbidden אם המניפסט לא התיר מופעים מרובים.
 ```
 
-ה-`param` נמסר לדף התוסף באירוע `plugin.page_opened`:
+ה-`param` נמסר למופע שנפתח באירוע `plugin.page_opened`:
 
 ```javascript
 Otzaria.on('plugin.page_opened', (data) => {
@@ -2791,8 +2802,21 @@ Otzaria.on('plugin.page_opened', (data) => {
 });
 ```
 
+כדי לאפשר פתיחת מופעים מרובים, הוסף למניפסט:
+
+```json
+{
+  "minAppVersion": "0.9.99",
+  "contributes": {
+    "toolTab": {
+      "allowMultipleInstances": true
+    }
+  }
+}
+```
+
 **הערות:**
-- אם דף התוסף עדיין לא נטען, האירוע יישלח מיד אחרי ה-boot שלו — אין צורך בהמתנה מיוחדת.
+- אם דף התוסף עדיין לא נטען, האירוע יישלח אחרי ה-boot של המופע המדויק שנפתח.
 - לפתיחת תוסף אחר יש API נפרד — `plugin.openOther`.
 
 ---

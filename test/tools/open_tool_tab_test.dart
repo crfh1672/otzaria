@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:otzaria/tools/open_tool_tab.dart';
 import 'package:otzaria/tools/tool_catalog_entry.dart';
+import 'package:otzaria/tabs/models/tool_tab.dart';
 
 void main() {
   const entry = ToolCatalogEntry(
@@ -22,6 +23,19 @@ void main() {
       final a = newToolTabInstance(entry);
       final b = newToolTabInstance(entry);
       expect(a.instanceId, isNot(b.instanceId));
+    });
+
+    test('openToolInstanceCount counts only matching tool IDs', () {
+      final a = newToolTabInstance(entry);
+      final b = newToolTabInstance(entry);
+      final other = ToolTab(
+        toolId: 'com.example.other',
+        title: 'תוסף אחר',
+        allowMultipleInstances: true,
+      );
+
+      expect(openToolInstanceCount([a, b, other], entry.toolId), 2);
+      expect(openToolInstanceCount([a, b, other], 'com.example.other'), 1);
     });
   });
 }

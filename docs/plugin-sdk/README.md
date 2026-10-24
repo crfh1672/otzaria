@@ -159,6 +159,7 @@ my-plugin/
 | `network.enabled` | `false` | האם להצהיר על שימוש ברשת (חובה כדי להפעיל את מנגנון הרשת בתוסף) |
 | `network.allowlist` | `[]` | רשימת ה-URLs שהתוסף מצהיר שהוא צריך. ה-URL חייב להופיע כאן **וגם** להיות מאושר ע"י אוצריא בקובץ `plugin_network_allowlist.txt` שבשורש ריפו אוצריא ב-GitHub (ענף `dev`). הצהרה ב-manifest לבדה **אינה** מספיקה. |
 | `contributes.toolTab.title` | שם התוסף | כותרת הטאב. אם מגדירים אותה במפורש — חייבת להיות זהה ל-`name` (עד 14 תווים), אחרת התוסף יידחה |
+| `contributes.toolTab.allowMultipleInstances` | `false` | אם `true`, התוסף רשאי לפתוח מופע נוסף של עצמו דרך `plugin.openSelf({ newTab: true })` (מגרסה 0.9.99). עד שני מופעים בחלון |
 | `contributes.toolTab.order` | `900` | סדר הופעה בין התוספים (מספר נמוך = קודם). תוספים מוצגים תמיד אחרי הכלים המובנים |
 | `contributes.toolTab.defaultPinned` | `true` | האם להצמיד אוטומטית בהתקנה |
 | `contributes.toolTab.iconName` | `null` | שם אייקון 24px שיוצג בטאב, מספריית אוצריא או מ-FluentUI, למשל `"book_24_regular"`. ראה [ICONS.md](ICONS.md) |

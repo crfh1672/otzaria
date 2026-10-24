@@ -718,6 +718,10 @@ class MainWindowScreenState extends State<MainWindowScreen>
     }
 
     PluginPageLauncher.instance.register(_windowKeys, _openPluginPage);
+    PluginPageLauncher.instance.registerInstanceOpener(
+      _windowKeys,
+      _openPluginInstance,
+    );
     ToolsLauncherController.instance.register(_windowKeys, _openToolsLauncher);
 
     // הצגת פופאפ פרסומת אחרי 5 שניות
@@ -1836,6 +1840,10 @@ class MainWindowScreenState extends State<MainWindowScreen>
     _startupRefreshWait.cancel();
     _indexingDeferral.clear();
     PluginPageLauncher.instance.unregister(_windowKeys, _openPluginPage);
+    PluginPageLauncher.instance.unregisterInstanceOpener(
+      _windowKeys,
+      _openPluginInstance,
+    );
     ToolsLauncherController.instance.unregister(
       _windowKeys,
       _openToolsLauncher,
@@ -1939,6 +1947,11 @@ class MainWindowScreenState extends State<MainWindowScreen>
   void _openPluginPage(String pluginId) {
     if (!mounted) return;
     openToolTabById(context, pluginId);
+  }
+
+  String? _openPluginInstance(String pluginId) {
+    if (!mounted) return null;
+    return openPluginToolInstanceById(context, pluginId);
   }
 
   void _openToolsLauncher() {

@@ -519,11 +519,16 @@ void main() {
 
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
-    addTearDown(mouse.removePointer);
     await mouse.moveTo(_centerOfText(tester, '(26)'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     expect(find.byType(LinkHoverPreviewContent), findsOneWidget);
+
+    // Remove the pointer while the widget is still mounted. Removing it in
+    // test teardown races the scheduled MouseTracker update after unmount.
+    await mouse.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+    await mouse.removePointer();
   });
 
   group('חברותא במסד בסכמה 7 — ההערות בטבלת line_note של שורת היעד', () {
