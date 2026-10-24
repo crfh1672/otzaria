@@ -4365,28 +4365,41 @@ Future<void> main() async {
         }
 
         final keys = AppWindowKeys.current;
-        PluginPageLauncher.instance.registerInstanceOpener(keys, openInstance);
+        PluginPageLauncher.instance.registerInstanceOpener(
+          keys,
+          openInstance,
+        );
         addTearDown(() {
           PluginPageLauncher.instance.markPageClosed(
             'test.plugin',
             instanceId: newInstanceId,
           );
-          PluginPageLauncher.instance.unregisterInstanceOpener(keys, openInstance);
-      });
+          PluginPageLauncher.instance.unregisterInstanceOpener(
+            keys,
+            openInstance,
+          );
+        });
 
-      final result = await optedInAdapter.execute('plugin', 'openSelf', {
-        'newTab': true,
-        'param': 'second',
-      });
+        final result = await optedInAdapter.execute('plugin', 'openSelf', {
+          'newTab': true,
+          'param': 'second',
+        });
 
-      expect(result, isTrue);
-      expect(PluginPageLauncher.instance.hasPendingFor('test.plugin'), isTrue);
-      PluginPageLauncher.instance.markPageClosed(
-        'test.plugin',
-        instanceId: newInstanceId,
-      );
-      expect(PluginPageLauncher.instance.hasPendingFor('test.plugin'), isFalse);
-    });
+        expect(result, isTrue);
+        expect(
+          PluginPageLauncher.instance.hasPendingFor('test.plugin'),
+          isTrue,
+        );
+        PluginPageLauncher.instance.markPageClosed(
+          'test.plugin',
+          instanceId: newInstanceId,
+        );
+        expect(
+          PluginPageLauncher.instance.hasPendingFor('test.plugin'),
+          isFalse,
+        );
+      },
+    );
 
     test('plugin.openSelf newTab נדחה ללא opt-in במניפסט', () async {
       await expectLater(
