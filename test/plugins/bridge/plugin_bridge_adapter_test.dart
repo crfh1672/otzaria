@@ -4349,29 +4349,29 @@ Future<void> main() async {
     test(
       'plugin.openSelf newTab דורש opt-in ומנתב אירוע למופע חדש',
       () async {
-      final optedInAdapter = PluginBridgeAdapter(
-        _buildInstalledPlugin(
-          permissions: const ['navigation.write'],
-          allowMultipleInstances: true,
-        ),
-        dependencies: _buildNetworkDeps(),
-        pluginRepository: registry,
-      );
-
-      const newInstanceId = 'test.plugin.second';
-      String? openInstance(String pluginId) {
-        expect(pluginId, 'test.plugin');
-        return newInstanceId;
-      }
-
-      final keys = AppWindowKeys.current;
-      PluginPageLauncher.instance.registerInstanceOpener(keys, openInstance);
-      addTearDown(() {
-        PluginPageLauncher.instance.markPageClosed(
-          'test.plugin',
-          instanceId: newInstanceId,
+        final optedInAdapter = PluginBridgeAdapter(
+          _buildInstalledPlugin(
+            permissions: const ['navigation.write'],
+            allowMultipleInstances: true,
+          ),
+          dependencies: _buildNetworkDeps(),
+          pluginRepository: registry,
         );
-        PluginPageLauncher.instance.unregisterInstanceOpener(keys, openInstance);
+
+        const newInstanceId = 'test.plugin.second';
+        String? openInstance(String pluginId) {
+          expect(pluginId, 'test.plugin');
+          return newInstanceId;
+        }
+
+        final keys = AppWindowKeys.current;
+        PluginPageLauncher.instance.registerInstanceOpener(keys, openInstance);
+        addTearDown(() {
+          PluginPageLauncher.instance.markPageClosed(
+            'test.plugin',
+            instanceId: newInstanceId,
+          );
+          PluginPageLauncher.instance.unregisterInstanceOpener(keys, openInstance);
       });
 
       final result = await optedInAdapter.execute('plugin', 'openSelf', {
