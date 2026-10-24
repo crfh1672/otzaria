@@ -43,7 +43,9 @@ void main() {
       expect(manifest.toolTabIconName, isNull);
     });
 
-    test('allowMultipleInstances is opt-in and round-trips through the manifest', () {
+    test(
+      'allowMultipleInstances is opt-in and round-trips through the manifest',
+      () {
       final enabled = PluginManifest.fromJson({
         'schemaVersion': 1,
         'id': 'test.plugin.multiple',
