@@ -43,6 +43,41 @@ void main() {
       expect(manifest.toolTabIconName, isNull);
     });
 
+    test('allowMultipleInstances is opt-in and round-trips through the manifest', () {
+      final enabled = PluginManifest.fromJson({
+        'schemaVersion': 1,
+        'id': 'test.plugin.multiple',
+        'name': 'Multiple Plugin',
+        'version': '1.0.0',
+        'entrypoint': 'index.html',
+        'contributes': {
+          'toolTab': {
+            'title': 'Multiple Plugin',
+            'allowMultipleInstances': true,
+          },
+        },
+      });
+
+      expect(enabled.allowMultipleInstances, isTrue);
+      final encodedToolTab =
+          (enabled.toJson()['contributes'] as Map<String, dynamic>)['toolTab']
+              as Map<String, dynamic>;
+      expect(encodedToolTab['allowMultipleInstances'], isTrue);
+
+      final legacy = PluginManifest.fromJson({
+        'schemaVersion': 1,
+        'id': 'test.plugin.legacy',
+        'name': 'Legacy Plugin',
+        'version': '1.0.0',
+        'entrypoint': 'index.html',
+      });
+      expect(legacy.allowMultipleInstances, isFalse);
+      final legacyToolTab =
+          (legacy.toJson()['contributes'] as Map<String, dynamic>)['toolTab']
+              as Map<String, dynamic>;
+      expect(legacyToolTab.containsKey('allowMultipleInstances'), isFalse);
+    });
+
     test('backgroundEntrypoint is null when omitted', () {
       final manifest = PluginManifest.fromJson({
         'schemaVersion': 1,
