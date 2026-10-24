@@ -133,7 +133,8 @@ class PluginManifest {
               .toList() ??
           [],
       toolTabTitle: toolTab['title'] as String? ?? json['name'] as String,
-      allowMultipleInstances: toolTab['allowMultipleInstances'] as bool? ?? false,
+      allowMultipleInstances:
+          toolTab['allowMultipleInstances'] as bool? ?? false,
       toolTabOrder: toolTab['order'] as int? ?? 900,
       defaultPinned: toolTab['defaultPinned'] as bool? ?? true,
       toolTabIconName: toolTab['iconName'] as String?,
