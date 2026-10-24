@@ -24,17 +24,37 @@ class PluginPageLauncher {
     if (_navigators[keys] == navigator) _navigators[keys] = null;
   }
 
+  final _instanceOpeners = Expando<String? Function(String pluginId)>();
+
+  void registerInstanceOpener(
+    AppWindowKeys keys,
+    String? Function(String pluginId) opener,
+  ) => _instanceOpeners[keys] = opener;
+
+  void unregisterInstanceOpener(
+    AppWindowKeys keys,
+    String? Function(String pluginId) opener,
+  ) {
+    if (_instanceOpeners[keys] == opener) _instanceOpeners[keys] = null;
+  }
+
   final Map<
     ({String pluginId, int? viewId}),
     List<({String topic, Map<String, dynamic> payload})>
   >
   _pending = {};
   final Map<PluginInstanceKey, int?> _readyPages = {};
+  final Map<PluginInstanceKey, List<({String topic, Map<String, dynamic> payload, int? viewId})>>
+      _pendingByInstance = {};
   final Map<({String pluginId, int? viewId}), Future<void>> _deliveryChain = {};
 
-  bool hasPendingFor(String pluginId) => _pending.entries.any(
-    (entry) => entry.key.pluginId == pluginId && entry.value.isNotEmpty,
-  );
+  bool hasPendingFor(String pluginId) =>
+      _pending.entries.any(
+        (entry) => entry.key.pluginId == pluginId && entry.value.isNotEmpty,
+      ) ||
+      _pendingByInstance.entries.any(
+        (entry) => entry.key.pluginId == pluginId && entry.value.isNotEmpty,
+      );
 
   PluginInstanceKey? _readyPage(String pluginId, int? viewId) => _readyPages
       .entries
@@ -73,6 +93,29 @@ class PluginPageLauncher {
     _navigators[windowKeys ?? AppWindowKeys.current]?.call(pluginId);
   }
 
+  /// פותח מופע חדש של אותו תוסף, ומייעד אליו את אירוע הפתיחה.
+  /// מחזיר את מזהה המופע החדש, או null אם אין חלון שיכול לפתוח אותו.
+  String? openNewInstance(
+    String pluginId, {
+    String? topic,
+    Map<String, dynamic> payload = const {},
+    int? viewId,
+    AppWindowKeys? windowKeys,
+  }) {
+    final opener = _instanceOpeners[windowKeys ?? AppWindowKeys.current];
+    if (opener == null) return null;
+
+    final instanceId = opener(pluginId);
+    if (instanceId == null) return null;
+
+    if (topic != null) {
+      _pendingByInstance
+          .putIfAbsent((pluginId: pluginId, instanceId: instanceId), () => [])
+          .add((topic: topic, payload: payload, viewId: viewId));
+    }
+    return instanceId;
+  }
+
   void markPageReady(
     String pluginId, {
     String instanceId = PluginInstanceIds.defaultForeground,
@@ -93,6 +136,20 @@ class PluginPageLauncher {
         instanceId: instanceId,
       );
     }
+
+    final targeted = _pendingByInstance.remove((
+      pluginId: pluginId,
+      instanceId: instanceId,
+    ));
+    for (final event in targeted ?? <({String topic, Map<String, dynamic> payload, int? viewId})>[]) {
+      _enqueueDelivery(
+        pluginId,
+        event.topic,
+        event.payload,
+        viewId: event.viewId ?? viewId,
+        instanceId: instanceId,
+      );
+    }
   }
 
   void markPageClosed(
@@ -101,6 +158,7 @@ class PluginPageLauncher {
     int? viewId,
   }) {
     final key = (pluginId: pluginId, instanceId: instanceId);
+    _pendingByInstance.remove(key);
     final ownerView = _readyPages.containsKey(key)
         ? _readyPages.remove(key)
         : viewId;
@@ -116,6 +174,9 @@ class PluginPageLauncher {
   /// סגירה לפני יצירת דף אינה משאירה אירועים שממתינים לחלון שכבר איננו.
   void forgetWindow(int viewId) {
     _pending.removeWhere((key, _) => key.viewId == viewId);
+    _pendingByInstance.removeWhere(
+      (_, events) => events.any((event) => event.viewId == viewId),
+    );
     _deliveryChain.removeWhere((key, _) => key.viewId == viewId);
     _readyPages.removeWhere((_, owner) => owner == viewId);
   }
