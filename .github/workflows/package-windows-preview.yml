@@ -27,6 +27,29 @@ jobs:
           run-id: 40134992434
           github-token: ${{ github.token }}
 
+      # Mirror the official Windows packaging step: the app discovers these archives
+      # beside otzaria.exe and installs them into the user's plugin registry on first run.
+      - name: Download bundled plugin archives
+        shell: pwsh
+        run: .\installer\download_bundled_plugins.ps1 -Platform windows
+
+      - name: Include bundled plugins next to the app executable
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'installer\bundled_plugins'
+          $dest = Join-Path $env:GITHUB_WORKSPACE 'preview-build\bundled_plugins'
+          if (-not (Test-Path $source)) {
+            throw 'No bundled_plugins directory was produced; refusing to package an incomplete preview.'
+          }
+          $archives = @(Get-ChildItem -Path $source -Filter '*.otzplugin' -File)
+          if ($archives.Count -eq 0) {
+            throw 'No bundled plugin archives were downloaded; refusing to package an incomplete preview.'
+          }
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item -Path (Join-Path $source '*') -Destination $dest -Recurse -Force
+          Write-Host "Included $($archives.Count) bundled plugin archive(s):"
+          $archives | ForEach-Object { Write-Host " - $($_.Name) ($([math]::Round($_.Length / 1KB, 1)) KB)" }
+
       - name: Create installer script
         shell: pwsh
         run: |
