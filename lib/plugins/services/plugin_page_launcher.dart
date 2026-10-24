@@ -2,6 +2,13 @@ import 'package:otzaria/core/windowing/app_window_keys.dart';
 import 'package:otzaria/plugins/plugin_constants.dart';
 import 'package:otzaria/plugins/services/plugin_runtime_dispatcher.dart';
 
+/// אירוע פתיחה שמיועד למופע מסוים של תוסף.
+typedef _TargetedPluginEvent = ({
+  String topic,
+  Map<String, dynamic> payload,
+  int? viewId,
+});
+
 /// מנווט לדף תוסף ומוסר לו אירועים בחלון שפתח אותו, גם כשה-boot עדיין ממתין.
 class PluginPageLauncher {
   static final PluginPageLauncher instance = PluginPageLauncher._();
@@ -44,8 +51,7 @@ class PluginPageLauncher {
   >
   _pending = {};
   final Map<PluginInstanceKey, int?> _readyPages = {};
-  final Map<PluginInstanceKey, List<({String topic, Map<String, dynamic> payload, int? viewId})>>
-      _pendingByInstance = {};
+  final Map<PluginInstanceKey, List<_TargetedPluginEvent>> _pendingByInstance = {};
   final Map<({String pluginId, int? viewId}), Future<void>> _deliveryChain = {};
 
   bool hasPendingFor(String pluginId) =>
@@ -141,7 +147,7 @@ class PluginPageLauncher {
       pluginId: pluginId,
       instanceId: instanceId,
     ));
-    for (final event in targeted ?? <({String topic, Map<String, dynamic> payload, int? viewId})>[]) {
+    for (final event in targeted ?? <_TargetedPluginEvent>[]) {
       _enqueueDelivery(
         pluginId,
         event.topic,
