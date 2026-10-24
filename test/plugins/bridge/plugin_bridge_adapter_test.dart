@@ -4346,7 +4346,9 @@ Future<void> main() async {
       expect(navigations, ['test.plugin']);
     });
 
-    test('plugin.openSelf newTab דורש opt-in ומנתב אירוע למופע חדש', () async {
+    test(
+      'plugin.openSelf newTab דורש opt-in ומנתב אירוע למופע חדש',
+      () async {
       final optedInAdapter = PluginBridgeAdapter(
         _buildInstalledPlugin(
           permissions: const ['navigation.write'],
@@ -4387,7 +4389,7 @@ Future<void> main() async {
     });
 
     test('plugin.openSelf newTab נדחה ללא opt-in במניפסט', () async {
-      expect(
+      await expectLater(
         adapter.execute('plugin', 'openSelf', {'newTab': true}),
         throwsA(
           predicate(
@@ -4398,7 +4400,7 @@ Future<void> main() async {
     });
 
     test('plugin.openSelf rejects a non-boolean newTab argument', () async {
-      expect(
+      await expectLater(
         adapter.execute('plugin', 'openSelf', {'newTab': 'true'}),
         throwsA(
           predicate(
