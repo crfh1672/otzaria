@@ -52,6 +52,75 @@ void openNewToolTabInstance(BuildContext context, ToolCatalogEntry entry) {
   );
 }
 
+/// מספר המופעים הפתוחים של כלי, כולל חלוניות מפוצלות.
+int openToolInstanceCount(Iterable<OpenedTab> tabs, String toolId) =>
+    tabs
+        .expand(leafPanes)
+        .whereType<ToolTab>()
+        .where((tab) => tab.toolId == toolId)
+        .length;
+
+/// תקרת המופעים המקבילים לתוסף. נועדה למנוע פתיחות בלתי מוגבלות של WebView.
+const int kMaxPluginToolInstances = 2;
+
+/// פותח מופע עצמאי של תוסף ומחזיר את מזהה המופע, או null אם לא ניתן לפתוח.
+String? openPluginToolInstanceById(BuildContext context, String pluginId) {
+  final tabsBloc = context.read<TabsBloc>();
+  if (openToolInstanceCount(tabsBloc.state.tabs, pluginId) >=
+      kMaxPluginToolInstances) {
+    final name = lookupTool(
+      pluginId,
+      hiddenBuiltInToolIds:
+          context.read<SettingsBloc>().state.hiddenBuiltInToolIds,
+      isOfflineMode: context.read<SettingsBloc>().state.isOfflineMode,
+      pluginState: context.read<PluginSystemBloc>().state,
+    );
+    final label = switch (name) {
+      ToolAvailable(:final entry) => entry.label,
+      ToolUnavailable(:final name) => name ?? pluginId,
+    };
+    UiSnack.showError(
+      ToolsMessages.pluginInstanceLimitReached(
+        label,
+        kMaxPluginToolInstances,
+      ),
+    );
+    return null;
+  }
+
+  final settingsState = context.read<SettingsBloc>().state;
+  final result = lookupTool(
+    pluginId,
+    hiddenBuiltInToolIds: settingsState.hiddenBuiltInToolIds,
+    isOfflineMode: settingsState.isOfflineMode,
+    pluginState: context.read<PluginSystemBloc>().state,
+  );
+
+  switch (result) {
+    case ToolAvailable(:final entry):
+      final tab = newToolTabInstance(entry);
+      tabsBloc.add(OpenOrFocusTab(tab));
+      context.read<NavigationBloc>().add(
+        const NavigateToScreen(Screen.reading),
+      );
+      return tab.instanceId;
+    case ToolUnavailable(reason: ToolUnavailableReason.loading):
+      final tab = ToolTab(
+        toolId: pluginId,
+        title: ToolTab.fallbackTitleFor(pluginId),
+        allowMultipleInstances: true,
+      );
+      tabsBloc.add(OpenOrFocusTab(tab));
+      context.read<NavigationBloc>().add(
+        const NavigateToScreen(Screen.reading),
+      );
+      return tab.instanceId;
+    case ToolUnavailable(:final reason, :final name):
+      UiSnack.showError(toolUnavailableMessage(reason, name, pluginId));
+      return null;
+  }
+}
+
 /// פותח כלי לפי מזהה בלבד — לקישורים עמוקים, קיצורי מקלדת ופריטים מוצמדים
 /// לסרגל הניווט.
 ///
