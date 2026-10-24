@@ -66,16 +66,17 @@ const int kMaxPluginToolInstances = 2;
 /// פותח מופע עצמאי של תוסף ומחזיר את מזהה המופע, או null אם לא ניתן לפתוח.
 String? openPluginToolInstanceById(BuildContext context, String pluginId) {
   final tabsBloc = context.read<TabsBloc>();
+  final settingsState = context.read<SettingsBloc>().state;
+  final result = lookupTool(
+    pluginId,
+    hiddenBuiltInToolIds: settingsState.hiddenBuiltInToolIds,
+    isOfflineMode: settingsState.isOfflineMode,
+    pluginState: context.read<PluginSystemBloc>().state,
+  );
+
   if (openToolInstanceCount(tabsBloc.state.tabs, pluginId) >=
       kMaxPluginToolInstances) {
-    final name = lookupTool(
-      pluginId,
-      hiddenBuiltInToolIds:
-          context.read<SettingsBloc>().state.hiddenBuiltInToolIds,
-      isOfflineMode: context.read<SettingsBloc>().state.isOfflineMode,
-      pluginState: context.read<PluginSystemBloc>().state,
-    );
-    final label = switch (name) {
+    final label = switch (result) {
       ToolAvailable(:final entry) => entry.label,
       ToolUnavailable(:final name) => name ?? pluginId,
     };
@@ -87,14 +88,6 @@ String? openPluginToolInstanceById(BuildContext context, String pluginId) {
     );
     return null;
   }
-
-  final settingsState = context.read<SettingsBloc>().state;
-  final result = lookupTool(
-    pluginId,
-    hiddenBuiltInToolIds: settingsState.hiddenBuiltInToolIds,
-    isOfflineMode: settingsState.isOfflineMode,
-    pluginState: context.read<PluginSystemBloc>().state,
-  );
 
   switch (result) {
     case ToolAvailable(:final entry):
