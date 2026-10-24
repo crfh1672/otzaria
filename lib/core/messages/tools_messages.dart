@@ -10,7 +10,8 @@ abstract class ToolsMessages {
       'הכלי "$toolLabel" מוסתר. ניתן להציג אותו דרך הגדרות → ניהול כלים';
   static String toolNotFound(String toolId) => 'הכלי "$toolId" לא נמצא';
   static String pluginInstanceLimitReached(String pluginName, int max) =>
-      'התוסף "$pluginName" כבר פתוח ב-$max כרטיסיות. יש לסגור אחת מהן כדי לפתוח נוספת';
+      'התוסף "$pluginName" כבר פתוח ב-$max כרטיסיות. '
+      'יש לסגור אחת מהן כדי לפתוח נוספת';
 
   // ── מילונים (ארמית וראשי תיבות) ──
   static String dictionaryLoadError(Object error) =>
