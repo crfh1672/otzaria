@@ -51,7 +51,8 @@ class PluginPageLauncher {
   >
   _pending = {};
   final Map<PluginInstanceKey, int?> _readyPages = {};
-  final Map<PluginInstanceKey, List<_TargetedPluginEvent>> _pendingByInstance = {};
+  final Map<PluginInstanceKey, List<_TargetedPluginEvent>>
+      _pendingByInstance = {};
   final Map<({String pluginId, int? viewId}), Future<void>> _deliveryChain = {};
 
   bool hasPendingFor(String pluginId) =>
