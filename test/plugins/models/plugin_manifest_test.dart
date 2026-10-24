@@ -46,18 +46,18 @@ void main() {
     test(
       'allowMultipleInstances is opt-in and round-trips through the manifest',
       () {
-      final enabled = PluginManifest.fromJson({
-        'schemaVersion': 1,
-        'id': 'test.plugin.multiple',
-        'name': 'Multiple Plugin',
-        'version': '1.0.0',
-        'entrypoint': 'index.html',
-        'contributes': {
-          'toolTab': {
-            'title': 'Multiple Plugin',
-            'allowMultipleInstances': true,
+        final enabled = PluginManifest.fromJson({
+          'schemaVersion': 1,
+          'id': 'test.plugin.multiple',
+          'name': 'Multiple Plugin',
+          'version': '1.0.0',
+          'entrypoint': 'index.html',
+          'contributes': {
+            'toolTab': {
+              'title': 'Multiple Plugin',
+              'allowMultipleInstances': true,
+            },
           },
-        },
       });
 
       expect(enabled.allowMultipleInstances, isTrue);
