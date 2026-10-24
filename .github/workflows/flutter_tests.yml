@@ -452,15 +452,6 @@ jobs:
       - name: Build Windows (debug)
         run: flutter build windows --debug
 
-      # Artifact להורדה לצורך בדיקת PR; אינו יוצר Release ואינו מפרסם גרסה.
-      - name: Upload Windows debug app
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: otzaria-windows-debug
-          path: build/windows/x64/runner/Debug/**
-          if-no-files-found: error
-          retention-days: 7
-
       # המנוע בבניית האפליקציה בלי SQLite משלו; כשל ברישום אינו נראה בשום טסט
       # יחידה. רץ על הבנייה הנייטיבית שלמעלה, ולכן מוסיף רק קומפילציה וריצה.
       - name: Engine SQLite integration test (Windows)
