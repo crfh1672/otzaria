@@ -54,6 +54,10 @@ class AppSegmentedControl<T> extends StatelessWidget {
   final bool showSelectedIcon;
   final double? height;
 
+  /// עיצוב תווית וריווח אופציונליים עבור פקדים צפופים.
+  final TextStyle? labelStyle;
+  final EdgeInsetsGeometry? segmentPadding;
+
   /// Lines a label may wrap to before it is cut with an ellipsis. Above 1,
   /// [height] is a minimum and the control grows when a label wraps.
   final int maxLabelLines;
@@ -66,6 +70,8 @@ class AppSegmentedControl<T> extends StatelessWidget {
     this.expandToFillWidth = false,
     this.showSelectedIcon = false,
     this.height,
+    this.labelStyle,
+    this.segmentPadding,
     this.maxLabelLines = 1,
   });
 
@@ -79,7 +85,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
             // ואז maxLines חותך אותו למילה הראשונה.
             label: Text(
               o.label,
-              style: AppTextStyles.settingTitle,
+              style: labelStyle ?? AppTextStyles.settingTitle,
               maxLines: maxLabelLines,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
@@ -122,6 +128,9 @@ class AppSegmentedControl<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isFixed = height != null;
+    final padding = segmentPadding == null
+        ? null
+        : WidgetStatePropertyAll<EdgeInsetsGeometry>(segmentPadding!);
 
     return SegmentedButton<T>(
       segments: _segments(),
@@ -134,6 +143,8 @@ class AppSegmentedControl<T> extends StatelessWidget {
       selectedIcon: const Icon(FluentIcons.checkmark_24_regular, size: 16),
       style: isFixed
           ? _buttonStyle(cs).copyWith(
+              padding: padding,
+              visualDensity: VisualDensity.compact,
               minimumSize: WidgetStateProperty.all(Size(0, height!)),
               maximumSize: WidgetStateProperty.all(
                 Size(
@@ -143,6 +154,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
               ),
             )
           : _buttonStyle(cs).copyWith(
+              padding: padding,
               visualDensity: VisualDensity.compact,
             ),
     );
