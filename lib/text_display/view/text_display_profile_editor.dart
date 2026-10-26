@@ -164,11 +164,6 @@ abstract final class TextDisplayProfileEditor {
               currentValue: profile.teamim,
               onChanged: (v) => onChanged(profile.copyWith(teamim: v)),
               labelStyle: Theme.of(context).textTheme.labelSmall,
-              segmentPadding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 0,
-              ),
-              height: 28,
             ),
           ],
         ),
