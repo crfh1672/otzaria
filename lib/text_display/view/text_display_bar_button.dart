@@ -102,7 +102,7 @@ class TextDisplayPopupPanel extends StatelessWidget {
     this.onReset,
   });
 
-  static const double width = 640;
+  static const double width = 440;
 
   @override
   Widget build(BuildContext context) {
@@ -110,20 +110,20 @@ class TextDisplayPopupPanel extends StatelessWidget {
     return SizedBox(
       width: width,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppTokens.spaceSM),
+        padding: const EdgeInsets.symmetric(vertical: AppTokens.spaceXS),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppTokens.spaceMD,
+                horizontal: AppTokens.spaceSM,
               ),
               child: Row(
                 children: [
                   Text(
                     'תצוגת הטקסט',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -148,7 +148,7 @@ class TextDisplayPopupPanel extends StatelessWidget {
             for (final (i, section) in sections.indexed) ...[
               if (i > 0) const Divider(height: 1),
               _SectionTitle(section.title),
-              ...TextDisplayProfileEditor.tiles(
+              ...TextDisplayProfileEditor.popupTiles(
                 context,
                 profile: section.profile,
                 onChanged: section.onChanged,
@@ -157,9 +157,9 @@ class TextDisplayPopupPanel extends StatelessWidget {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppTokens.spaceMD,
                 AppTokens.spaceSM,
-                AppTokens.spaceMD,
+                AppTokens.spaceXS,
+                AppTokens.spaceSM,
                 0,
               ),
               child: Row(
@@ -302,9 +302,9 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(
-      AppTokens.spaceMD,
       AppTokens.spaceSM,
-      AppTokens.spaceMD,
+      AppTokens.spaceXS,
+      AppTokens.spaceSM,
       0,
     ),
     child: Text(
