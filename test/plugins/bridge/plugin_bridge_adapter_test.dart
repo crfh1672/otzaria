@@ -4540,7 +4540,9 @@ Future<void> main() async {
           'test.plugin',
           instanceId: 'inst-new',
         );
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+        for (var i = 0; i < 400 && fresh.jsCalls.isEmpty; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
 
         expect(result, isTrue);
         expect(opened, ['test.plugin']);
