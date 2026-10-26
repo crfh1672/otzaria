@@ -88,4 +88,85 @@ abstract final class TextDisplayProfileEditor {
       ),
     ];
   }
+
+  /// פקדים צפופים לחלונית הסרגל. שמות הקודש נשארים בהגדרות המלאות
+  /// ואינם מוצגים בחלונית הקטנה.
+  static List<Widget> popupTiles(
+    BuildContext context, {
+    required TextDisplayProfile profile,
+    required ValueChanged<TextDisplayProfile> onChanged,
+  }) {
+    final t = context.settingsText;
+
+    Widget visibilityRow({
+      required IconData icon,
+      required String title,
+      required MarkVisibility value,
+      required ValueChanged<MarkVisibility> onValue,
+    }) {
+      return Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(title, style: Theme.of(context).textTheme.bodySmall),
+            ),
+            Switch(
+              value: value == MarkVisibility.show,
+              onChanged: (show) => onValue(
+                show ? MarkVisibility.show : MarkVisibility.hide,
+              ),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return [
+      visibilityRow(
+        icon: OtzariaIcons.alef_niqqud_24_filled,
+        title: t('ניקוד'),
+        value: profile.nikud,
+        onValue: (v) => onChanged(profile.copyWith(nikud: v)),
+      ),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
+        child: Row(
+          children: [
+            Icon(OtzariaIcons.alef_niqqud_taamim_24_filled, size: 18,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(t('טעמי המקרא'),
+                style: Theme.of(context).textTheme.bodySmall),
+            ),
+            AppSegmentedControl<TeamimVisibility>(
+              options: [
+                SegmentOption(value: TeamimVisibility.show, label: t('הצג')),
+                SegmentOption(value: TeamimVisibility.hide, label: t('הסתר')),
+                SegmentOption(value: TeamimVisibility.followNikud, label: t('כמו הניקוד')),
+              ],
+              currentValue: profile.teamim,
+              onChanged: (v) => onChanged(profile.copyWith(teamim: v)),
+            ),
+          ],
+        ),
+      ),
+      visibilityRow(
+        icon: OtzariaIcons.alef_punctuation_24_filled,
+        title: t('סימני פיסוק'),
+        value: profile.punctuation,
+        onValue: (v) => onChanged(profile.copyWith(punctuation: v)),
+      ),
+      visibilityRow(
+        icon: OtzariaIcons.text_font_hebrew_24_filled,
+        title: t('ציוני המפרשים'),
+        value: profile.anchorMarkers,
+        onValue: (v) => onChanged(profile.copyWith(anchorMarkers: v)),
+      ),
+    ];
+  }
 }
