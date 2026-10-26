@@ -21,7 +21,7 @@ String textDisplayBarTooltip(bool removeNikud) =>
     removeNikud ? 'הצג ניקוד' : 'הסתר ניקוד';
 
 const String textDisplayMenuTooltip =
-    'תצוגת הטקסט: ניקוד, טעמים, פיסוק, שם הוי"ה וציונים';
+    'תצוגת הטקסט: ניקוד, טעמים, פיסוק וציוני מפרשים';
 
 /// כפתור "תצוגת הטקסט" בסרגל: לחיצה ראשית מחליפה ניקוד, והחץ פותח פאנל
 /// שמספק [panelBuilder]. אינו תלוי ב-BLoC — ראה [TextBookDisplayBarButton].
