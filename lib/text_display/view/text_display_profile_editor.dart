@@ -105,11 +105,15 @@ abstract final class TextDisplayProfileEditor {
       required ValueChanged<MarkVisibility> onValue,
     }) {
       return Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 1, 10, 1),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(width: 8),
+            Icon(
+              icon,
+              size: 17,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(title, style: Theme.of(context).textTheme.bodySmall),
             ),
@@ -133,24 +137,38 @@ abstract final class TextDisplayProfileEditor {
         onValue: (v) => onChanged(profile.copyWith(nikud: v)),
       ),
       Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 1, 10, 1),
         child: Row(
           children: [
-            Icon(OtzariaIcons.alef_niqqud_taamim_24_filled, size: 18,
-              color: Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(width: 8),
+            Icon(
+              OtzariaIcons.alef_niqqud_taamim_24_filled,
+              size: 17,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
             Expanded(
-              child: Text(t('טעמי המקרא'),
-                style: Theme.of(context).textTheme.bodySmall),
+              child: Text(
+                t('טעמי המקרא'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
             AppSegmentedControl<TeamimVisibility>(
               options: [
                 SegmentOption(value: TeamimVisibility.show, label: t('הצג')),
                 SegmentOption(value: TeamimVisibility.hide, label: t('הסתר')),
-                SegmentOption(value: TeamimVisibility.followNikud, label: t('כמו הניקוד')),
+                SegmentOption(
+                  value: TeamimVisibility.followNikud,
+                  label: t('כמו הניקוד'),
+                ),
               ],
               currentValue: profile.teamim,
               onChanged: (v) => onChanged(profile.copyWith(teamim: v)),
+              labelStyle: Theme.of(context).textTheme.labelSmall,
+              segmentPadding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 0,
+              ),
+              height: 28,
             ),
           ],
         ),
