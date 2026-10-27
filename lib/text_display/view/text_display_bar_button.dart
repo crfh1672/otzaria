@@ -152,6 +152,7 @@ class TextDisplayPopupPanel extends StatelessWidget {
                 context,
                 profile: section.profile,
                 onChanged: section.onChanged,
+                includeTeamimSelector: target == TextTarget.body,
               ),
             ],
             const Divider(height: 1),
