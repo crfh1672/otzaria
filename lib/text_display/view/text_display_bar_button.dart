@@ -79,11 +79,13 @@ class TextDisplaySection {
   final String title;
   final TextDisplayProfile profile;
   final ValueChanged<TextDisplayProfile> onChanged;
+  final bool includeTeamimSelector;
 
   const TextDisplaySection({
     required this.title,
     required this.profile,
     required this.onChanged,
+    this.includeTeamimSelector = true,
   });
 }
 
@@ -152,7 +154,7 @@ class TextDisplayPopupPanel extends StatelessWidget {
                 context,
                 profile: section.profile,
                 onChanged: section.onChanged,
-                includeTeamimSelector: target == TextTarget.body,
+                includeTeamimSelector: section.includeTeamimSelector,
               ),
             ],
             const Divider(height: 1),
@@ -280,6 +282,7 @@ class TextBookDisplayPanel extends StatelessWidget {
                   state.displayProfile(target: target),
                   next,
                 ),
+                includeTeamimSelector: target == TextTarget.body,
               ),
           ],
           footer: settings.enablePerBookSettings
