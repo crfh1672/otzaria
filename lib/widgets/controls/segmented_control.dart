@@ -58,6 +58,9 @@ class AppSegmentedControl<T> extends StatelessWidget {
   final TextStyle? labelStyle;
   final EdgeInsetsGeometry? segmentPadding;
 
+  /// מציג את אייקון האפשרות בלבד; התווית נשארת זמינה ב-tooltip.
+  final bool iconOnly;
+
   /// Lines a label may wrap to before it is cut with an ellipsis. Above 1,
   /// [height] is a minimum and the control grows when a label wraps.
   final int maxLabelLines;
@@ -72,6 +75,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
     this.height,
     this.labelStyle,
     this.segmentPadding,
+    this.iconOnly = false,
     this.maxLabelLines = 1,
   });
 
@@ -83,13 +87,15 @@ class AppSegmentedControl<T> extends StatelessWidget {
             value: o.value,
             // בלי FittedBox: בתוך לחצן הוא פורס את הטקסט ברוחב מילה אחת,
             // ואז maxLines חותך אותו למילה הראשונה.
-            label: Text(
-              o.label,
-              style: labelStyle ?? AppTextStyles.settingTitle,
-              maxLines: maxLabelLines,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
+            label: iconOnly
+                ? const SizedBox.shrink()
+                : Text(
+                    o.label,
+                    style: labelStyle ?? AppTextStyles.settingTitle,
+                    maxLines: maxLabelLines,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
             icon: hasIcons ? _buildOptionIcon(o) : null,
             // תווית ארוכה נחתכת ב-ellipsis; הטולטיפ מציג אותה במלואה.
             tooltip: o.label,
