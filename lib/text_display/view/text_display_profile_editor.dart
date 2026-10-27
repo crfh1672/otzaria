@@ -1,3 +1,4 @@
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:otzaria/settings/l10n/settings_l10n_exports.dart';
 import 'package:otzaria/settings/widgets/settings_widgets_exports.dart';
@@ -95,6 +96,7 @@ abstract final class TextDisplayProfileEditor {
     BuildContext context, {
     required TextDisplayProfile profile,
     required ValueChanged<TextDisplayProfile> onChanged,
+    bool includeTeamimSelector = true,
   }) {
     final t = context.settingsText;
 
@@ -136,38 +138,48 @@ abstract final class TextDisplayProfileEditor {
         value: profile.nikud,
         onValue: (v) => onChanged(profile.copyWith(nikud: v)),
       ),
-      Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(10, 1, 10, 1),
-        child: Row(
-          children: [
-            Icon(
-              OtzariaIcons.alef_niqqud_taamim_24_filled,
-              size: 17,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                t('טעמי המקרא'),
-                style: Theme.of(context).textTheme.bodySmall,
+      if (includeTeamimSelector)
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(10, 1, 10, 1),
+          child: Row(
+            children: [
+              Icon(
+                OtzariaIcons.alef_niqqud_taamim_24_filled,
+                size: 17,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-            ),
-            AppSegmentedControl<TeamimVisibility>(
-              options: [
-                SegmentOption(value: TeamimVisibility.show, label: t('הצג')),
-                SegmentOption(value: TeamimVisibility.hide, label: t('הסתר')),
-                SegmentOption(
-                  value: TeamimVisibility.followNikud,
-                  label: t('כמו הניקוד'),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  t('טעמי המקרא'),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ],
-              currentValue: profile.teamim,
-              onChanged: (v) => onChanged(profile.copyWith(teamim: v)),
-              labelStyle: Theme.of(context).textTheme.labelSmall,
-            ),
-          ],
+              ),
+              AppSegmentedControl<TeamimVisibility>(
+                options: [
+                  SegmentOption(
+                    value: TeamimVisibility.show,
+                    label: t('הצג'),
+                    icon: FluentIcons.eye_24_regular,
+                  ),
+                  SegmentOption(
+                    value: TeamimVisibility.hide,
+                    label: t('הסתר'),
+                    icon: FluentIcons.eye_off_24_regular,
+                  ),
+                  SegmentOption(
+                    value: TeamimVisibility.followNikud,
+                    label: t('כמו הניקוד'),
+                    icon: FluentIcons.link_24_regular,
+                  ),
+                ],
+                currentValue: profile.teamim,
+                onChanged: (v) => onChanged(profile.copyWith(teamim: v)),
+                iconOnly: true,
+              ),
+            ],
+          ),
         ),
-      ),
       visibilityRow(
         icon: OtzariaIcons.alef_punctuation_24_filled,
         title: t('סימני פיסוק'),
