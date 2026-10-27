@@ -13,6 +13,7 @@ class SegmentOption<T> {
   final String label;
   final IconData? icon;
   final IconData? rtlIcon;
+  final Widget? customIcon;
 
   /// תת-כותרת המשויכת לאפשרות זו — נלקחת אוטומטית ע"י
   /// [SettingsActionTile.segmentedTile] כשלא סופק subtitle מפורש.
@@ -23,10 +24,15 @@ class SegmentOption<T> {
     required this.label,
     this.icon,
     this.rtlIcon,
+    this.customIcon,
     this.subtitle,
   }) : assert(
          icon == null || rtlIcon == null,
          'העבר icon או rtlIcon — לא שניהם יחד',
+       ),
+       assert(
+         customIcon == null || (icon == null && rtlIcon == null),
+         'העבר customIcon או IconData — לא שניהם יחד',
        );
 }
 
@@ -57,8 +63,9 @@ class AppSegmentedControl<T> extends StatelessWidget {
   /// עיצוב תווית וריווח אופציונליים עבור פקדים צפופים.
   final TextStyle? labelStyle;
   final EdgeInsetsGeometry? segmentPadding;
+  final double iconSize;
 
-  /// מציג את אייקון האפשרות בלבד; התווית נשארת זמינה ב-tooltip.
+  /// מציג רק את הסמל במרכז כל מקטע; התווית נשארת זמינה ב-tooltip.
   final bool iconOnly;
 
   /// Lines a label may wrap to before it is cut with an ellipsis. Above 1,
@@ -75,12 +82,15 @@ class AppSegmentedControl<T> extends StatelessWidget {
     this.height,
     this.labelStyle,
     this.segmentPadding,
+    this.iconSize = 18,
     this.iconOnly = false,
     this.maxLabelLines = 1,
   });
 
   List<ButtonSegment<T>> _segments() {
-    final hasIcons = options.any((o) => o.icon != null || o.rtlIcon != null);
+    final hasIcons = options.any(
+      (o) => o.icon != null || o.rtlIcon != null || o.customIcon != null,
+    );
     return options
         .map(
           (o) => ButtonSegment<T>(
@@ -88,7 +98,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
             // בלי FittedBox: בתוך לחצן הוא פורס את הטקסט ברוחב מילה אחת,
             // ואז maxLines חותך אותו למילה הראשונה.
             label: iconOnly
-                ? const SizedBox.shrink()
+                ? _buildOptionIcon(o)
                 : Text(
                     o.label,
                     style: labelStyle ?? AppTextStyles.settingTitle,
@@ -96,7 +106,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis,
                   ),
-            icon: hasIcons ? _buildOptionIcon(o) : null,
+            icon: !iconOnly && hasIcons ? _buildOptionIcon(o) : null,
             // תווית ארוכה נחתכת ב-ellipsis; הטולטיפ מציג אותה במלואה.
             tooltip: o.label,
           ),
@@ -105,9 +115,10 @@ class AppSegmentedControl<T> extends StatelessWidget {
   }
 
   Widget _buildOptionIcon(SegmentOption<T> o) {
-    if (o.rtlIcon != null) return RtlIcon(o.rtlIcon!, size: 18);
-    if (o.icon != null) return Icon(o.icon, size: 18);
-    return const SizedBox(width: 18);
+    if (o.customIcon != null) return o.customIcon!;
+    if (o.rtlIcon != null) return RtlIcon(o.rtlIcon!, size: iconSize);
+    if (o.icon != null) return Icon(o.icon, size: iconSize);
+    return SizedBox(width: iconSize);
   }
 
   static ButtonStyle _buttonStyle(ColorScheme cs) => ButtonStyle(
@@ -157,6 +168,18 @@ class AppSegmentedControl<T> extends StatelessWidget {
                   double.infinity,
                   maxLabelLines > 1 ? double.infinity : height!,
                 ),
+              ),
+            )
+          : iconOnly
+          ? _buttonStyle(cs).copyWith(
+              padding: padding ??
+                  const WidgetStatePropertyAll<EdgeInsetsGeometry>(
+                    EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  ),
+              visualDensity: VisualDensity.compact,
+              minimumSize: const WidgetStatePropertyAll(Size(0, 28)),
+              maximumSize: const WidgetStatePropertyAll(
+                Size(double.infinity, 28),
               ),
             )
           : _buttonStyle(cs).copyWith(
