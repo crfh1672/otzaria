@@ -160,12 +160,12 @@ abstract final class TextDisplayProfileEditor {
                   SegmentOption(
                     value: TeamimVisibility.show,
                     label: t('הצג'),
-                    icon: FluentIcons.eye_24_regular,
+                    icon: OtzariaIcons.alef_niqqud_taamim_24_filled,
                   ),
                   SegmentOption(
                     value: TeamimVisibility.hide,
                     label: t('הסתר'),
-                    icon: FluentIcons.eye_off_24_regular,
+                    icon: FluentIcons.dismiss_24_regular,
                   ),
                   SegmentOption(
                     value: TeamimVisibility.followNikud,
