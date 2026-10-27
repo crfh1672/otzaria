@@ -165,17 +165,29 @@ abstract final class TextDisplayProfileEditor {
                   SegmentOption(
                     value: TeamimVisibility.hide,
                     label: t('הסתר'),
-                    icon: FluentIcons.dismiss_24_regular,
+                    icon: FluentIcons.eye_off_24_regular,
                   ),
                   SegmentOption(
                     value: TeamimVisibility.followNikud,
                     label: t('כמו הניקוד'),
-                    icon: FluentIcons.link_24_regular,
+                    customIcon: const Text(
+                      '=',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        height: 1,
+                      ),
+                    ),
                   ),
                 ],
                 currentValue: profile.teamim,
                 onChanged: (v) => onChanged(profile.copyWith(teamim: v)),
                 iconOnly: true,
+                iconSize: 16,
+                segmentPadding: const EdgeInsets.symmetric(
+                  horizontal: 3,
+                  vertical: 0,
+                ),
               ),
             ],
           ),
