@@ -104,7 +104,7 @@ class TextDisplayPopupPanel extends StatelessWidget {
     this.onReset,
   });
 
-  static const double width = 360;
+  static const double width = 320;
 
   @override
   Widget build(BuildContext context) {
