@@ -90,8 +90,7 @@ abstract final class TextDisplayProfileEditor {
     ];
   }
 
-  /// פקדים צפופים לחלונית הסרגל. שמות הקודש נשארים בהגדרות המלאות
-  /// ואינם מוצגים בחלונית הקטנה.
+  /// פקדים צפופים לחלונית הסרגל; כל ההגדרות זמינות גם כאן.
   static List<Widget> popupTiles(
     BuildContext context, {
     required TextDisplayProfile profile,
@@ -190,7 +189,7 @@ abstract final class TextDisplayProfileEditor {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(FluentIcons.chevron_down_16_regular, size: 14),
+                    const Icon(FluentIcons.chevron_down_24_regular, size: 14),
                   ],
                 ),
               ),
