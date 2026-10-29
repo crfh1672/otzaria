@@ -282,7 +282,7 @@ class TextBookDisplayPanel extends StatelessWidget {
                   state.displayProfile(target: target),
                   next,
                 ),
-                includeTeamimSelector: target == TextTarget.body,
+                includeTeamimSelector: true,
               ),
           ],
           footer: settings.enablePerBookSettings
