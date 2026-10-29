@@ -131,6 +131,116 @@ abstract final class TextDisplayProfileEditor {
       );
     }
 
+    String holyNameLabel(HolyNameDisplay value) => switch (value) {
+      HolyNameDisplay.asIs => t('ככתבו'),
+      HolyNameDisplay.kufKuf => t('יקוק'),
+      HolyNameDisplay.daletDalet => t('ידוד'),
+      HolyNameDisplay.hehApostrophe => t("ה'"),
+      HolyNameDisplay.doubleYod => t('יי'),
+    };
+
+    Widget holyNameRow() => Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(10, 1, 10, 1),
+      child: Row(
+        children: [
+          Icon(
+            OtzariaIcons.alef_lock_24_filled,
+            size: 17,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              t('שם הוי"ה'),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          SizedBox(
+            width: 122,
+            child: AppPopupMenuButton<HolyNameDisplay>(
+              entries: [
+                AppMenuEntry(value: HolyNameDisplay.asIs, label: t('ככתבו')),
+                AppMenuEntry(value: HolyNameDisplay.kufKuf, label: t('יקוק')),
+                AppMenuEntry(value: HolyNameDisplay.daletDalet, label: t('ידוד')),
+                AppMenuEntry(value: HolyNameDisplay.hehApostrophe, label: t("ה'")),
+                AppMenuEntry(value: HolyNameDisplay.doubleYod, label: t('יי')),
+              ],
+              initialValue: profile.holyName,
+              onSelected: (value) {
+                if (value != null) {
+                  onChanged(profile.copyWith(holyName: value));
+                }
+              },
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 28),
+                padding: const EdgeInsetsDirectional.fromSTEB(8, 3, 6, 3),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        holyNameLabel(profile.holyName),
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(FluentIcons.chevron_down_16_regular, size: 14),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    Widget divineNamesRow() => Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(10, 1, 10, 1),
+      child: Row(
+        children: [
+          Icon(
+            OtzariaIcons.alef_crown_24_filled,
+            size: 17,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              t('שאר שמות הקודש'),
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          AppSegmentedControl<DivineNamesDisplay>(
+            options: [
+              SegmentOption(
+                value: DivineNamesDisplay.asIs,
+                label: t('ככתבם'),
+              ),
+              SegmentOption(
+                value: DivineNamesDisplay.substitute,
+                label: t('בכינוי'),
+              ),
+            ],
+            currentValue: profile.divineNames,
+            onChanged: (v) => onChanged(profile.copyWith(divineNames: v)),
+            labelStyle: Theme.of(context).textTheme.labelSmall,
+            segmentPadding: const EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+
     return [
       visibilityRow(
         icon: OtzariaIcons.alef_niqqud_24_filled,
@@ -198,6 +308,8 @@ abstract final class TextDisplayProfileEditor {
         value: profile.punctuation,
         onValue: (v) => onChanged(profile.copyWith(punctuation: v)),
       ),
+      holyNameRow(),
+      divineNamesRow(),
       visibilityRow(
         icon: OtzariaIcons.text_font_hebrew_24_filled,
         title: t('ציוני המפרשים'),
