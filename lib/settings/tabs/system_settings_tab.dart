@@ -3,7 +3,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
+import 'package:otzaria/theme/app_tokens.dart';
 import 'package:otzaria_icons/otzaria_icons.dart';
 import 'package:otzaria/settings/engine/app_settings_store.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -361,7 +364,10 @@ class _SystemSettingsTabState extends State<SystemSettingsTab> {
   static const _keyBackupPlugins = 'key-backup-plugins';
   static const _keyAutoBackupFrequency = 'key-auto-backup-frequency';
 
-  _BackupMode _selectedBackupMode = _BackupMode.all;
+  late _BackupMode _selectedBackupMode = BackupService.includesAllSections
+      ? _BackupMode.all
+      : _BackupMode.custom;
+  late final StreamSubscription<BoxEvent> _backupSettingsSubscription;
 
   // ── גיבוי (expandable) ─────────────────────────────────────────────────────
   bool _isBackupExpanded = false;
@@ -382,6 +388,16 @@ class _SystemSettingsTabState extends State<SystemSettingsTab> {
   @override
   void initState() {
     super.initState();
+    _backupSettingsSubscription = Hive.box<dynamic>(HiveCache.keyName)
+        .watch()
+        .where((event) => BackupService.sectionSettingKeys.contains(event.key))
+        .listen((_) {
+          setState(() {
+            _selectedBackupMode = BackupService.includesAllSections
+                ? _BackupMode.all
+                : _BackupMode.custom;
+          });
+        });
     _loadVersionInfo();
     _refreshLibraryChanges();
     LibraryChangesNotes.instance.revision.addListener(_refreshLibraryChanges);
@@ -439,6 +455,7 @@ class _SystemSettingsTabState extends State<SystemSettingsTab> {
 
   @override
   void dispose() {
+    unawaited(_backupSettingsSubscription.cancel());
     LibraryChangesNotes.instance.revision.removeListener(
       _refreshLibraryChanges,
     );
@@ -552,9 +569,7 @@ class _SystemSettingsTabState extends State<SystemSettingsTab> {
     );
   }
 
-  bool _shouldInclude(String key) =>
-      _selectedBackupMode == _BackupMode.all ||
-      (Settings.getValue<bool>(key) ?? true);
+  bool _shouldInclude(String key) => Settings.getValue<bool>(key) ?? true;
 
   // ════════════════════════════════════════════════════════════════════════════
   //  BUILD
@@ -1398,7 +1413,12 @@ class _SystemSettingsTabState extends State<SystemSettingsTab> {
                 ),
               ],
               currentValue: _selectedBackupMode,
-              onChanged: (value) => setState(() => _selectedBackupMode = value),
+              onChanged: (value) {
+                if (value == _BackupMode.all) {
+                  unawaited(BackupService.includeAllSections());
+                }
+                setState(() => _selectedBackupMode = value);
+              },
             ),
             if (_selectedBackupMode == _BackupMode.custom) ...[
               _BackupOptionTile(
@@ -1625,33 +1645,52 @@ class _SystemSettingsTabState extends State<SystemSettingsTab> {
       context: context,
       builder: settingsDialogBuilder(
         context,
-        (ctx) => AlertDialog(
-          title: Text(ctx.settingsText('יומן שינויים בתוכנה')),
-          content: SizedBox(
+        (ctx) => AppDialog.singleAction(
+          title: ctx.settingsText('יומן שינויים בתוכנה'),
+          icon: FluentIcons.history_24_regular,
+          headerBand: true,
+          confirmText: ctx.settingsText('סגור'),
+          customContent: SizedBox(
             width: 600,
             height: 400,
             // Markdown הגלילתי אומד את היקף התוכן מהפריטים הבנויים בלבד
             // והאגודל "רוקד" בגלילה; היקף מדויק דרך SingleChildScrollView.
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: MarkdownBody(
-                data: changelog,
-                onTapLink: (text, href, title) {
-                  if (href != null) launchUrl(Uri.parse(href));
-                },
+            child: ListDialogCard(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: MarkdownBody(
+                  data: changelog,
+                  styleSheet: changelogMarkdownStyle(Theme.of(ctx)),
+                  onTapLink: (text, href, title) {
+                    if (href != null) launchUrl(Uri.parse(href));
+                  },
+                ),
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(ctx.settingsText('סגור')),
-            ),
-          ],
         ),
       ),
     );
   }
+}
+
+/// סגנון יומן השינויים: כותרות גרסה בצבע הנושא, וגוף קריא ברווחי שורה.
+@visibleForTesting
+MarkdownStyleSheet changelogMarkdownStyle(ThemeData theme) {
+  final cs = theme.colorScheme;
+  TextStyle heading(double size) => TextStyle(
+    fontSize: size,
+    fontWeight: FontWeight.bold,
+    color: cs.primary,
+  );
+  return MarkdownStyleSheet.fromTheme(theme).copyWith(
+    h1: heading(AppTokens.fontXL + 2),
+    h2: heading(AppTokens.fontXL),
+    h3: heading(AppTokens.fontLG),
+    p: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+    listBullet: theme.textTheme.bodyMedium?.copyWith(color: cs.primary),
+    h2Padding: const EdgeInsets.only(top: AppTokens.spaceMD),
+  );
 }
 
 // ── _BackupOptionTile ─────────────────────────────────────────────────────────

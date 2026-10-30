@@ -1,7 +1,4 @@
-// טסט רגרסיה לפתיחת פאנל הגדרות צורת הדף דרך ה-notifier:
-// כפתור גלגל השיניים בסרגל העליון (TextBookScreen) רק מסמן בקשה ב-notifier,
-// ו-PageShapeScreen הוא שפותח את פאנל ההגדרות הצף (ContextOverlayPanel) בצד
-// הימני — עם onSettingsChanged מחווט, כדי שכל שינוי יוחל על המסך בעדכון חי.
+// בדיקות פתיחת חלונית ההגדרות דרך ה-notifier והחיווט לעדכון חי.
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
@@ -644,7 +641,7 @@ void main() {
     );
   });
   testWidgets(
-    'בורר המפרשים של צורת הדף אינו מציע את "הערות" ולא מפרשים נדירים',
+    'בורר המפרשים של צורת הדף מציע את "הערות" ולא מפרשים נדירים',
     (tester) async {
       final openSettingsNotifier = ValueNotifier<int>(0);
       addTearDown(openSettingsNotifier.dispose);
@@ -697,9 +694,12 @@ void main() {
       final panel = tester.widget<PageShapeSettingsPanel>(
         find.byType(PageShapeSettingsPanel),
       );
-      // 'הערות' הוא מפרש וירטואלי בלי קישורים — טור שנפתח ונעלם (issue #1227);
-      // מפרש "נדיר" הוא בדרך כלל קישור שסווג בטעות (issue #1233).
-      expect(panel.availableCommentators, ['רש"י על ספר בדיקה']);
+      // מפרש "נדיר" הוא בדרך כלל קישור שסווג בטעות (issue #1233). 'הערות'
+      // מוצג כטור מהערות הספר עצמו (issues #3400, #3507).
+      expect(panel.availableCommentators, [
+        'רש"י על ספר בדיקה',
+        kNotesCommentatorTitle,
+      ]);
     },
   );
 }
@@ -720,6 +720,7 @@ TextBookLoaded _loadedState({
     activeCommentators: const [],
     commentatorGroups: const [],
     availableCommentators: availableCommentators,
+    commentatorsLoaded: true,
     links: const [],
     visibleLinks: const [],
     linksByLine: const {},

@@ -11,8 +11,9 @@ import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
 import 'package:otzaria/settings/l10n/settings_l10n_exports.dart';
 import 'package:otzaria/core/ui_snack.dart';
 import 'package:otzaria/models/books.dart';
+import 'package:otzaria/theme/app_tokens.dart';
 import 'package:otzaria/utils/file/save_file_with_extension.dart';
-import 'package:otzaria/widgets/text/rtl_text_field.dart';
+import 'package:otzaria/widgets/text/otzaria_search_field.dart';
 import 'package:otzaria/widgets/widgets_exports.dart';
 
 /// פותח דיאלוג עם רשימת כל הספרים בספרייה, חיפוש, וייצוא ל-CSV.
@@ -103,57 +104,49 @@ class _BooksListDialogState extends State<_BooksListDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return ListDialogFrame(
       icon: OtzariaIcons.book_24_regular,
       title: context.settingsText('רשימת הספרים'),
       counter: '${_visibleRows.length} / ${_rows.length}',
       children: [
-        const SizedBox(height: 12),
-        RtlTextField(
+        const SizedBox(height: AppTokens.spaceMD),
+        OtzariaSearchField(
           controller: _searchController,
           autofocus: true,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(OtzariaIcons.search_24_regular),
-            hintText: context.settingsText(
-              'חיפוש לפי שם, מחבר או קטגוריה',
-            ),
-            border: const OutlineInputBorder(),
-            isDense: true,
-          ),
+          hintText: context.settingsText('חיפוש לפי שם, מחבר או קטגוריה'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppTokens.spaceMD),
         Expanded(
           child: _visibleRows.isEmpty
-              ? Center(
-                  child: Text(
-                    context.settingsText('לא נמצאו ספרים'),
-                    style: TextStyle(color: cs.onSurfaceVariant),
-                  ),
+              ? OtzariaEmptyState(
+                  isCompact: true,
+                  icon: OtzariaIcons.search_in_library_24_regular,
+                  title: context.settingsText('לא נמצאו ספרים'),
                 )
-              : Scrollbar(
-                  controller: _scrollController,
-                  thumbVisibility: true,
-                  child: ListView.builder(
+              : ListDialogCard(
+                  child: Scrollbar(
                     controller: _scrollController,
-                    // גובה שורה קבוע: קפיצת פס הגלילה לא בונה את כל השורות בדרך
-                    prototypeItem: _BookListRow(
-                      row: _BookRow(
-                        title: ' ',
-                        author: ' ',
-                        category: '',
-                        fileType: '',
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      // גובה שורה קבוע: קפיצת פס הגלילה לא בונה את כל השורות בדרך
+                      prototypeItem: _BookListRow(
+                        row: _BookRow(
+                          title: ' ',
+                          author: ' ',
+                          category: '',
+                          fileType: '',
+                        ),
                       ),
-                    ),
-                    itemCount: _visibleRows.length,
-                    itemBuilder: (_, i) => _BookListRow(
-                      row: _visibleRows[i],
+                      itemCount: _visibleRows.length,
+                      itemBuilder: (_, i) => _BookListRow(
+                        row: _visibleRows[i],
+                      ),
                     ),
                   ),
                 ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppTokens.spaceMD),
         Row(
           children: [
             ActionButton.recommended(
@@ -181,7 +174,8 @@ class _BookListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final subtitleStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+    final subtitleStyle = TextStyle(
+      fontSize: AppTokens.fontSM,
       color: cs.onSurfaceVariant,
     );
     final detailsLine = [
@@ -193,10 +187,13 @@ class _BookListRow extends StatelessWidget {
     // שורה אחת לכל שדה, גם כשאין פרטים: הגובה חייב להיות זהה לתבנית.
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: cs.surfaceContainerHighest)),
+        border: Border(bottom: listDialogRowDivider(context)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        padding: const EdgeInsets.symmetric(
+          vertical: AppTokens.spaceSM,
+          horizontal: AppTokens.spaceMD,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -206,7 +203,11 @@ class _BookListRow extends StatelessWidget {
                 row.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: TextStyle(
+                  fontSize: AppTokens.fontMD + 1,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
               ),
             ),
             const SizedBox(height: 2),

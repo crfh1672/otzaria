@@ -24,6 +24,7 @@ import 'package:otzaria/services/data_collection_service.dart';
 import 'package:otzaria/services/direct_error_report_service.dart';
 import 'package:otzaria/services/book_details_service.dart';
 import 'package:otzaria/widgets/controls/action_buttons.dart';
+import 'package:otzaria_icons/otzaria_icons.dart';
 import 'package:otzaria/widgets/dialogs/dialogs_exports.dart';
 import 'package:otzaria/widgets/dialogs/error_report_sender_email_dialog.dart';
 import 'package:otzaria/widgets/misc/app_selection_area.dart';
@@ -113,9 +114,7 @@ class _DirectReportDetails extends StatelessWidget {
           null => BookProtectionRepository.instance.forTitle(report.bookTitle),
         },
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: DetailsCard(
             children: [
               if (report.rejectionReason != null)
                 _ReportDetailRow(
@@ -184,21 +183,28 @@ class _ReportDetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayValue = value.trim().isEmpty ? 'לא נשלח ערך' : value.trim();
+    if (child == null) {
+      return DetailsInfoSection(
+        title: label,
+        value: displayValue,
+        // ערך קצר בשורה אחת עם התווית; ארוך או רב־שורות מתחתיה.
+        block: displayValue.length > 36 || displayValue.contains('\n'),
+      );
+    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.spaceSM + 1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium,
+            style: TextStyle(
+              fontSize: AppTokens.fontMD,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-          const SizedBox(height: 3),
-          child ??
-              Text(
-                displayValue,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+          const SizedBox(height: AppTokens.spaceXS),
+          child!,
         ],
       ),
     );
@@ -758,6 +764,8 @@ $detailsSection
     await showSingleActionDialog(
       context: context,
       title: title,
+      icon: FluentIcons.document_text_24_regular,
+      headerBand: true,
       confirmText: 'סגור',
       customContent: _DirectReportDetails(report: report),
     );
@@ -1117,10 +1125,10 @@ class TabbedReportDialog extends StatefulWidget {
 }
 
 /// הגובה שבו טופס הצעת התיקון נכנס כמעט בלי גלילה.
-const double _comfortableReportDialogHeight = 640;
+const double _comfortableReportDialogHeight = 660;
 
 /// טופס בלי עורך תיקון קצר; הגובה קבוע כדי שלא ישתנה בזמן הקלדה.
-const double _freeTextReportDialogHeight = 540;
+const double _freeTextReportDialogHeight = 560;
 
 class _TabbedReportDialogState extends State<TabbedReportDialog>
     with SingleTickerProviderStateMixin {
@@ -1214,13 +1222,7 @@ class _TabbedReportDialogState extends State<TabbedReportDialog>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text(
-                'דיווח על טעות בספר',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            _buildHeader(context),
             TabBar(
               controller: _tabController,
               splashBorderRadius: AppTokens.borderRadiusAll,
@@ -1241,6 +1243,18 @@ class _TabbedReportDialogState extends State<TabbedReportDialog>
           ],
         ),
       ),
+    );
+  }
+
+  /// כותרת בצורת כותרת [AppReportDialog]: אייקון מסומל, שם הטופס ואיפה
+  /// מדווחים.
+  Widget _buildHeader(BuildContext context) {
+    return AppDialogHeader(
+      icon: OtzariaIcons.book_exclamation_24_regular,
+      title: 'דיווח על טעות בספר',
+      subtitle: widget.bookTitle,
+      subtitleMaxLines: 1,
+      compact: true,
     );
   }
 
@@ -1299,9 +1313,9 @@ class _TabbedReportDialogState extends State<TabbedReportDialog>
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            ActionButton.neutral(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('סגור'),
+              text: 'סגור',
             ),
           ],
         ),
@@ -1359,6 +1373,9 @@ enum _ReportMode { correction, freeText }
 const String _sendShortcut = 'ctrl+enter';
 
 class _RegularReportTabState extends State<RegularReportTab> {
+  bool _isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
   final TextEditingController _detailsController = TextEditingController();
   late _ReportMode _mode = widget.correctionTemplate == null
       ? _ReportMode.freeText
@@ -1523,19 +1540,30 @@ class _RegularReportTabState extends State<RegularReportTab> {
                     )
                   else ...[
                     Text(
-                      'הטקסט שנבחר:',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      'הטקסט שנבחר',
+                      style: TextStyle(
+                        fontSize: AppTokens.fontMD,
                         fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppTokens.spaceXS),
                     Container(
                       constraints: const BoxConstraints(
                         maxHeight: 150,
                       ),
                       width: double.infinity,
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
+                        // כהה מתיבת הקלט שמתחתיו: הטקסט המצוטט הוא מידע, והתיבה
+                        // הבהירה היא המקום להקליד בו.
+                        color: _isDark(context)
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLowest
+                            : Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHigh,
                         border: Border.all(
                           color: Theme.of(context).colorScheme.outlineVariant,
                         ),
@@ -1569,7 +1597,12 @@ class _RegularReportTabState extends State<RegularReportTab> {
                     autofocus: !_isCorrection,
                     decoration: InputDecoration(
                       isDense: true,
-                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: _isDark(context)
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest
+                          : AppSurfaces.card(context),
                       labelText: _isCorrection
                           ? 'הסבר לתיקון (רשות)'
                           : 'פירוט הטעות (חובה)',

@@ -6,6 +6,7 @@ import 'package:otzaria/core/focus_repository.dart';
 import 'package:otzaria/core/messages/common_messages.dart';
 import 'package:otzaria/core/ui_snack.dart';
 import 'package:otzaria/shortcuts/shortcut_helper.dart';
+import 'package:otzaria/widgets/dialogs/app_dialog_frame.dart';
 import 'package:otzaria/widgets/misc/rtl_icon.dart';
 import 'package:otzaria/widgets/widgets_exports.dart';
 
@@ -100,39 +101,45 @@ class _CustomShortcutDialogState extends State<CustomShortcutDialog>
           // נחכה שכל המקשים ישוחררו
         }
       },
-      child: AlertDialog(
+      child: AppDialogFrame(
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-        title: const Text(
-          'הגדרת קיצור מקשים מותאם אישית',
-          textAlign: TextAlign.right,
-        ),
-        content: SizedBox(
-          width: 400,
+        title: 'הגדרת קיצור מקשים מותאם אישית',
+        icon: FluentIcons.keyboard_24_regular,
+        width: 500,
+        actions: [
+          ActionButton.neutral(
+            text: 'ביטול',
+            onPressed: () => Navigator.pop(context),
+          ),
+          ActionButton.recommended(
+            text: 'אישור',
+            onPressed: _confirmShortcut,
+          ),
+        ],
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
                 'התחל הקלטה ובחר קיצור',
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 14),
+                style: TextStyle(fontSize: AppTokens.fontMD),
               ),
               if (widget.actionName != null &&
                   widget.actionName!.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: AppTokens.spaceSM),
                 Text(
                   widget.actionName!,
-                  textAlign: TextAlign.right,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: AppTokens.fontLG,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],
-              const SizedBox(height: 20),
+              const SizedBox(height: AppTokens.spaceLG),
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(AppTokens.spaceLG),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: AppTokens.borderRadiusAll,
@@ -170,17 +177,16 @@ class _CustomShortcutDialogState extends State<CustomShortcutDialog>
                 ),
               ),
               if (!_isRecording && _pressedKeys.isNotEmpty) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: AppTokens.spaceMD),
                 Text(
                   'Enter או אישור',
-                  textAlign: TextAlign.right,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppTokens.fontSM,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: AppTokens.spaceMD),
               if (_isRecording)
                 ActionButton.neutral(
                   onPressed: () {
@@ -195,7 +201,7 @@ class _CustomShortcutDialogState extends State<CustomShortcutDialog>
                   text: 'עצור הקלטה',
                 )
               else
-                ActionButton.recommended(
+                ActionButton.neutral(
                   onPressed: () {
                     setState(() {
                       _pressedKeys.clear();
@@ -209,16 +215,6 @@ class _CustomShortcutDialogState extends State<CustomShortcutDialog>
             ],
           ),
         ),
-        actions: [
-          ActionButton.neutral(
-            text: 'ביטול',
-            onPressed: () => Navigator.pop(context),
-          ),
-          ActionButton.recommended(
-            text: 'אישור',
-            onPressed: _confirmShortcut,
-          ),
-        ],
       ),
     );
   }

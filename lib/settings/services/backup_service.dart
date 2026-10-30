@@ -25,6 +25,7 @@ import 'package:otzaria/workspaces/workspace.dart';
 import 'package:otzaria/personal_notes/storage/personal_notes_database.dart';
 import 'package:otzaria/personal_notes/models/personal_note.dart';
 import 'package:otzaria/personal_notes/services/personal_note_draft_service.dart';
+import 'package:otzaria/plugins/plugin_constants.dart';
 import 'package:otzaria/plugins/storage/plugin_system_database.dart';
 import 'package:otzaria/plugins/models/installed_plugin.dart';
 import 'package:otzaria/plugins/models/plugin_valid_permissions.dart';
@@ -207,10 +208,8 @@ class BackupService {
       final file = File(backupPath);
       _logger.info('Writing backup data (${backupData.length} keys)...');
 
-      final jsonString = json.encode(backupData);
-      _logger.info('JSON size: ${jsonString.length} characters');
-
-      await file.writeAsString(jsonString);
+      final jsonLength = await writeBackupJson(backupPath, backupData);
+      _logger.info('JSON size: $jsonLength characters');
       _logger.info('Backup file written successfully');
 
       // Verify file was created
@@ -248,6 +247,7 @@ class BackupService {
   static const Map<String, String> unbackedStores = {
     'pending_external_activations.jsonl':
         'תור זמני של בקשות פתיחה מחוץ לתוכנה, מתרוקן בעיבוד',
+    'external_activations': 'תיקיית התור הזמני של בקשות הפתיחה מחוץ לתוכנה',
     'otzaria_capabilities.json':
         'הצהרת יכולות הגרסה למעדכן הלא-מקוון; נכתבת מחדש בכל עלייה',
     'plugin_install_results.jsonl':
@@ -418,7 +418,18 @@ class BackupService {
   static bool isPortableSettingKey(String key) =>
       !isNonSettingKey(key) && !nonPortableSettingsKeys.contains(key);
 
-  /// Backup bookmarks
+  /// גיבוי גדול נמשך שניות בקידוד JSON ו-UTF-8, ולכן נכתב מחוץ ל-isolate הראשי.
+  @visibleForTesting
+  static Future<int> writeBackupJson(
+    String path,
+    Map<String, dynamic> data,
+  ) => Isolate.run(() async {
+    final jsonString = json.encode(data);
+    // כתיבה סינכרונית מחזיקה TypedDataAcquire ומעכבת GC גם ב-isolates אחרים.
+    await File(path).writeAsString(jsonString);
+    return jsonString.length;
+  });
+
   static Future<List<Map<String, dynamic>>> _backupBookmarks() async {
     final repo = BookmarkRepository();
     final bookmarks = await repo.loadBookmarks();
@@ -1385,6 +1396,20 @@ class BackupService {
     }
   }
 
+  // storage.get מטמיע את הערך כמות שהוא בסקריפט של ה-WebView, וערך שאינו JSON
+  // היה משאיר את קריאת התוסף תלויה. כל כתיבה אחרת למחסן עוברת jsonEncode.
+  static bool _isRestorableKV(Map row) {
+    if (row['namespace'] != kDefaultStorageNamespace) return true;
+    final value = row['value_json'];
+    if (value is! String) return false;
+    try {
+      jsonDecode(value);
+      return true;
+    } on FormatException {
+      return false;
+    }
+  }
+
   // כשל בתוסף אחד מדווח כשחזור חלקי בלי למנוע שחזור של שאר התוספים.
   static Future<({bool hadFailures, int restored})> _restorePlugins(
     List<Map<String, dynamic>> pluginsData,
@@ -1460,7 +1485,9 @@ class BackupService {
           ],
           'kvStore': [
             for (final row in entry['kvStore'] as List? ?? const [])
-              if ((row as Map)['namespace'] != PluginUserFolderGrants.namespace)
+              if ((row as Map)['namespace'] !=
+                      PluginUserFolderGrants.namespace &&
+                  _isRestorableKV(row))
                 row,
           ],
           'publishedRecords': entry['publishedRecords'],
@@ -1671,6 +1698,27 @@ class BackupService {
     }
 
     return true;
+  }
+
+  /// מתגי סעיפי הגיבוי. הגיבוי הידני והאוטומטי קוראים את אותם מתגים,
+  /// ו"גבה הכל" במסך פירושו שכולם דולקים.
+  static const sectionSettingKeys = [
+    'key-backup-settings',
+    'key-backup-bookmarks',
+    'key-backup-history',
+    'key-backup-notes',
+    'key-backup-workspaces',
+    'key-backup-shamor-zachor',
+    'key-backup-plugins',
+  ];
+
+  static bool get includesAllSections =>
+      sectionSettingKeys.every((key) => Settings.getValue<bool>(key) ?? true);
+
+  static Future<void> includeAllSections() async {
+    await Future.wait(
+      sectionSettingKeys.map((key) => Settings.setValue<bool>(key, true)),
+    );
   }
 
   /// Perform automatic backup

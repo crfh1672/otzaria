@@ -4,6 +4,7 @@ import 'package:otzaria_icons/otzaria_icons.dart';
 import 'package:otzaria/library/hidden/hidden_library_selection.dart';
 import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
 import 'package:otzaria/settings/l10n/settings_l10n_exports.dart';
+import 'package:otzaria/theme/app_tokens.dart';
 import 'package:otzaria/widgets/widgets_exports.dart';
 
 /// חלון הספרים והקטגוריות המוסתרים, עם ביטול הסתרה (issue #1448).
@@ -87,20 +88,32 @@ class _HiddenBooksListDialogState extends State<_HiddenBooksListDialog> {
 
     Widget row(({String label, IconData icon, VoidCallback remove}) entry) =>
         ListTile(
-          shape: Border(bottom: BorderSide(color: cs.surfaceContainerHighest)),
-          leading: Icon(entry.icon, size: 20),
+          shape: Border(bottom: listDialogRowDivider(context)),
+          leading: Icon(entry.icon, size: 20, color: cs.primary),
           title: Tooltip(
             message: entry.label,
             child: Text(
               entry.label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: AppTokens.fontMD + 1,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
             ),
           ),
-          trailing: ActionButton.ghost(
-            text: context.settingsText('בטל הסתרה'),
-            onPressed: entry.remove,
-          ),
+          // ברוחב טלפון הכפתור עם הטקסט היה מצמצם את שם הספר לכמה אותיות.
+          trailing: MediaQuery.sizeOf(context).width < 520
+              ? IconButton(
+                  tooltip: context.settingsText('בטל הסתרה'),
+                  icon: const Icon(FluentIcons.eye_24_regular),
+                  onPressed: entry.remove,
+                )
+              : ActionButton.ghost(
+                  text: context.settingsText('בטל הסתרה'),
+                  onPressed: entry.remove,
+                ),
         );
 
     return ListDialogFrame(
@@ -110,7 +123,7 @@ class _HiddenBooksListDialogState extends State<_HiddenBooksListDialog> {
       maxWidth: 640,
       heightFactor: 0.8,
       children: [
-        const SizedBox(height: 8),
+        const SizedBox(height: AppTokens.spaceSM),
         Text(
           context.settingsText(
             'הרשימה מציגה בחירות ישירות. להסרת הסתרה בירושה, בטלו את הסתרת קטגוריית האב.',
@@ -119,46 +132,55 @@ class _HiddenBooksListDialogState extends State<_HiddenBooksListDialog> {
             color: cs.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppTokens.spaceMD),
         Flexible(
           child: entries.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Text(
-                    context.settingsText('אין בחירות הסתרה'),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: cs.onSurfaceVariant),
+                  child: OtzariaEmptyState(
+                    isCompact: true,
+                    icon: FluentIcons.eye_24_regular,
+                    title: context.settingsText('אין בחירות הסתרה'),
                   ),
                 )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  // גובה שורה קבוע: קפיצת פס הגלילה לא בונה את כל השורות בדרך
-                  prototypeItem: row(
-                    (
-                      label: '',
-                      icon: FluentIcons.folder_24_regular,
-                      remove: () {},
+              : ListDialogCard(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    // גובה שורה קבוע: קפיצת פס הגלילה לא בונה את כל השורות בדרך
+                    prototypeItem: row(
+                      (
+                        label: '',
+                        icon: FluentIcons.folder_24_regular,
+                        remove: () {},
+                      ),
                     ),
+                    itemCount: entries.length,
+                    itemBuilder: (_, i) => row(entries[i]),
                   ),
-                  itemCount: entries.length,
-                  itemBuilder: (_, i) => row(entries[i]),
                 ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppTokens.spaceMD),
         Row(
           children: [
-            ActionButton.recommended(
-              text: context.settingsText('שמור'),
-              onPressed: () =>
-                  Navigator.of(context).pop(_changed ? _selection : null),
-            ),
-            const SizedBox(width: 8),
-            if (entries.isNotEmpty)
-              ActionButton.warning(
-                text: context.settingsText('בטל הכול'),
-                onPressed: _clearAll,
+            // עוטף בשורה שנייה ברוחב טלפון במקום לגלוש.
+            Expanded(
+              child: Wrap(
+                spacing: AppTokens.spaceSM,
+                runSpacing: AppTokens.spaceSM,
+                children: [
+                  ActionButton.recommended(
+                    text: context.settingsText('שמור'),
+                    onPressed: () =>
+                        Navigator.of(context).pop(_changed ? _selection : null),
+                  ),
+                  if (entries.isNotEmpty)
+                    ActionButton.warning(
+                      text: context.settingsText('בטל הכול'),
+                      onPressed: _clearAll,
+                    ),
+                ],
               ),
-            const Spacer(),
+            ),
             ActionButton.ghost(
               text: context.settingsText('סגור'),
               onPressed: () => Navigator.of(context).pop(),

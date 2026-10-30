@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
 import 'package:otzaria/theme/app_tokens.dart';
 
 import 'package:flutter/material.dart';
@@ -19,9 +20,10 @@ class ZmanimSettingsContent extends StatelessWidget {
   const ZmanimSettingsContent({super.key});
 
   /// מחזיר את זמן ההגדרה ליום הנוכחי, או "—" אם אינו זמין/רלוונטי.
-  static String _timeFor(ZmanDefinition def, Map<String, String> dailyTimes) {
-    final t = dailyTimes[def.id];
-    return (t == null || t.isEmpty) ? '—' : t;
+  static String _timeFor(ZmanDefinition def, CalendarState state) {
+    final t = state.dailyTimes[def.id];
+    if (t == null || t.isEmpty) return '—';
+    return zmanTimeForDisplay(t, twelveHourClock: state.twelveHourClock);
   }
 
   @override
@@ -46,7 +48,9 @@ class ZmanimSettingsContent extends StatelessWidget {
       height: height,
       child: BlocBuilder<CalendarCubit, CalendarState>(
         buildWhen: (a, b) =>
-            a.enabledZmanim != b.enabledZmanim || a.dailyTimes != b.dailyTimes,
+            a.enabledZmanim != b.enabledZmanim ||
+            a.dailyTimes != b.dailyTimes ||
+            a.twelveHourClock != b.twelveHourClock,
         builder: (context, state) {
           final dailyTimes = state.dailyTimes;
           // סדר הרישום — שובר-שוויון יציב לזמני תאריך עברי (קידוש לבנה),
@@ -79,31 +83,42 @@ class ZmanimSettingsContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _SourceCredit(),
-              const _TableHeader(),
-              const Divider(height: 1),
               Expanded(
-                child: Scrollbar(
-                  child: ListView(
-                    primary: true,
-                    // מרווח בקצה (שמאל ב-RTL) כדי שסרגל הגלילה לא יכסה
-                    // את אייקוני המידע.
-                    padding: const EdgeInsetsDirectional.only(end: 14),
+                child: ListDialogCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final entry in categories.entries) ...[
-                        _CategoryHeader(title: entry.key),
-                        for (final (i, def) in ([
-                          ...entry.value,
-                        ]..sort(byTime)).indexed)
-                          _ZmanTableRow(
-                            definition: def,
-                            enabled: state.enabledZmanim.contains(def.id),
-                            timeLabel: _timeFor(def, dailyTimes),
-                            striped: i.isOdd,
-                            onChanged: (value) => context
-                                .read<CalendarCubit>()
-                                .setZmanEnabled(def.id, value),
+                      const _TableHeader(),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: Scrollbar(
+                          child: ListView(
+                            primary: true,
+                            // מרווח בקצה (שמאל ב-RTL) כדי שסרגל הגלילה לא יכסה
+                            // את אייקוני המידע.
+                            padding: const EdgeInsetsDirectional.only(end: 14),
+                            children: [
+                              for (final entry in categories.entries) ...[
+                                _CategoryHeader(title: entry.key),
+                                for (final (i, def) in ([
+                                  ...entry.value,
+                                ]..sort(byTime)).indexed)
+                                  _ZmanTableRow(
+                                    definition: def,
+                                    enabled: state.enabledZmanim.contains(
+                                      def.id,
+                                    ),
+                                    timeLabel: _timeFor(def, state),
+                                    striped: i.isOdd,
+                                    onChanged: (value) => context
+                                        .read<CalendarCubit>()
+                                        .setZmanEnabled(def.id, value),
+                                  ),
+                              ],
+                            ],
                           ),
-                      ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -183,7 +198,7 @@ class _TableHeader extends StatelessWidget {
           ),
           Expanded(child: Text('זמן', style: style)),
           SizedBox(
-            width: 96,
+            width: _timeColumnWidth(context),
             child: Text('היום', style: style, textAlign: TextAlign.center),
           ),
           const SizedBox(width: 32),
@@ -263,7 +278,7 @@ class _ZmanTableRow extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                width: 96,
+                width: _timeColumnWidth(context),
                 child: Text(
                   timeLabel,
                   textAlign: TextAlign.center,
@@ -333,6 +348,10 @@ class _ZmanInfoButton extends StatelessWidget {
 }
 
 /// עוזר להצגת הדיאלוג. ה-context חייב לכלול CalendarCubit ב-tree.
+/// עמודת השעה; ברוחב טלפון היא צרה, כדי ששם הזמן לא יישבר לשורה למילה.
+double _timeColumnWidth(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < 520 ? 64 : 96;
+
 Future<void> showZmanimSettingsDialog(BuildContext context) {
   final cubit = context.read<CalendarCubit>();
   return showDialog<void>(
@@ -340,14 +359,9 @@ Future<void> showZmanimSettingsDialog(BuildContext context) {
     builder: (_) => BlocProvider.value(
       value: cubit,
       child: const AppDialog.singleAction(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(FluentIcons.clock_24_regular),
-            SizedBox(width: 8),
-            Text('זמנים נוספים'),
-          ],
-        ),
+        title: 'זמנים נוספים',
+        icon: FluentIcons.clock_24_regular,
+        headerBand: true,
         customContent: ZmanimSettingsContent(),
         confirmText: 'סגור',
       ),

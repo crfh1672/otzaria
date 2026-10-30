@@ -3408,6 +3408,7 @@ class PluginBridgeAdapter {
       case 'getCorrectionDraft':
         return _correctionDraftAction(action, args);
       case 'addContextMenuItem':
+        _requireMultipleInstancesForNewTab(args);
         ContextMenuRegistry.instance.registerPayload(
           plugin.pluginId,
           args,
@@ -3433,6 +3434,7 @@ class PluginBridgeAdapter {
             'id and patch are required',
           );
         }
+        _requireMultipleInstancesForNewTab(Map<String, dynamic>.from(patch));
         ContextMenuRegistry.instance.update(
           plugin.pluginId,
           id,
@@ -3442,6 +3444,7 @@ class PluginBridgeAdapter {
         await _trackWhenStorageKeys(Map<String, dynamic>.from(patch));
         return true;
       case 'addToolbarItem':
+        _requireMultipleInstancesForNewTab(args);
         PluginToolbarRegistry.instance.registerPayload(
           plugin.pluginId,
           args,
@@ -3467,6 +3470,7 @@ class PluginBridgeAdapter {
             'id and patch are required',
           );
         }
+        _requireMultipleInstancesForNewTab(Map<String, dynamic>.from(patch));
         PluginToolbarRegistry.instance.update(
           plugin.pluginId,
           id,
@@ -6157,8 +6161,32 @@ class PluginBridgeAdapter {
     }
   }
 
-  /// רושם למעקב את מפתחות ה-KV של תנאי ה-`when` בפריט שנרשם בזמן ריצה,
-  /// אחרת הסינון שלו לא יגיב ל-`storage.set`.
+  /// גם ילד בתפריט יכול לפתוח מופע, ולכן בודקים את כל עץ הפריטים.
+  void _requireMultipleInstancesForNewTab(
+    Map<String, dynamic> payload, {
+    int depth = 0,
+  }) {
+    if (plugin.manifest.allowMultipleInstances) return;
+    if (payload['newTab'] == true) {
+      throw Exception(
+        'error.forbidden: contributes.toolTab.allowMultipleInstances '
+        'is not enabled in the manifest',
+      );
+    }
+    if (depth >= ContextMenuRegistry.maxNestingDepth) return;
+    final children = payload['children'];
+    if (children is List &&
+        children.length <= ContextMenuRegistry.maxChildren) {
+      for (final child in children.whereType<Map>()) {
+        _requireMultipleInstancesForNewTab(
+          Map<String, dynamic>.from(child),
+          depth: depth + 1,
+        );
+      }
+    }
+  }
+
+  /// עוקב אחר מפתחות תנאי ההצגה כדי שהפריט יגיב לשינוי באחסון.
   Future<void> _trackWhenStorageKeys(Map<String, dynamic> args) async {
     final raw = args['when'];
     if (raw == null) return;
@@ -6191,7 +6219,7 @@ class PluginBridgeAdapter {
           kDefaultStorageNamespace,
           key,
         );
-        return value != null ? jsonDecode(value) : null;
+        return value != null ? JavaScriptHandlerJsonResult(value) : null;
       case 'set':
         final key = args['key'] as String?;
         final value = args['value'];
@@ -6899,6 +6927,15 @@ class PluginBridgeAdapter {
           if (term is! String || term.trim().isEmpty || term.length > 200) {
             throw Exception('error.invalid_params: term required');
           }
+          final dictionaries = args['dictionaries'];
+          if (dictionaries != null &&
+              (dictionaries is! List ||
+                  dictionaries.length > 20 ||
+                  dictionaries.any((d) => d is! String || d.length > 100))) {
+            throw Exception(
+              'error.invalid_params: dictionaries must be a list of names',
+            );
+          }
           final names = await _derivedTextNames(null, args);
           final repository = DictionaryLookupRepository.instance;
           await repository.ensureAcronymsLoaded();
@@ -6918,11 +6955,17 @@ class PluginBridgeAdapter {
                 )
                 .toList(),
             'aramaic': repository
-                .findAramaicMatches(term)
+                .findAramaicMatches(
+                  term,
+                  dictionaries: dictionaries == null
+                      ? const {AramaicDictionaryEntry.peshitaDictionary}
+                      : {...dictionaries.cast<String>()},
+                )
                 .map(
                   (e) => {
                     'aramaic': e.aramaic,
                     'hebrew': filterPluginDivineNamesText(e.hebrew, names),
+                    'dictionary': e.dictionary,
                   },
                 )
                 .toList(),
@@ -7829,6 +7872,36 @@ class PluginBridgeAdapter {
         }
         return true;
       case 'openSelf':
+        final newTab = args['newTab'];
+        if (newTab != null && newTab is! bool) {
+          throw Exception('error.invalid_params: newTab must be boolean');
+        }
+        if (newTab == true) {
+          // מופע נוסף הוא WebView נוסף מעל אותו אחסון — רק תוסף שהצהיר
+          // במניפסט שהוא יודע לחיות לצד עצמו.
+          if (!plugin.manifest.allowMultipleInstances) {
+            throw Exception(
+              'error.forbidden: contributes.toolTab.allowMultipleInstances '
+              'is not enabled in the manifest',
+            );
+          }
+          // בלי כרטיסיה פתוחה של התוסף, newTab פותח את הראשית כמו פתיחה רגילה.
+          if (openToolInstanceCount(
+                _windowDependencies.tabsBloc.state.tabs,
+                plugin.pluginId,
+              ) >
+              0) {
+            final openedInstanceId = PluginPageLauncher.instance
+                .openNewInstance(
+                  plugin.pluginId,
+                  topic: 'plugin.page_opened',
+                  payload: {'param': args['param']},
+                  viewId: _windowDependencies.viewId,
+                  windowKeys: _windowDependencies.windowKeys,
+                );
+            return openedInstanceId != null;
+          }
+        }
         PluginPageLauncher.instance.open(
           plugin.pluginId,
           topic: 'plugin.page_opened',

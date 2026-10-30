@@ -15,7 +15,8 @@ class SettingsRepository {
   static const String keyFollowSystemTheme = 'key-follow-system-theme';
   static const String keySwatchColor = 'key-swatch-color';
   static const String keyDarkSwatchColor = 'key-dark-swatch-color';
-  static const String keyTextMaxWidth = 'key-text-max-width';
+  // לא key-text-max-width: ערכיו (אחוזים/פיקסלים יחסיים למסך) אינם רוחב יעד.
+  static const String keyTextColumnWidth = 'key-text-column-width';
   static const String keyFontSize = 'key-font-size';
   static const String keyFontFamily = 'key-font-family';
   static const String keyCommentatorsFontFamily =
@@ -60,6 +61,8 @@ class SettingsRepository {
   static const String keyCommentaryPaneWidth = 'key-commentary-pane-width';
   static const String keyCalendarType = 'key-calendar-type';
   static const String keyCalendarDayTransition = 'key-calendar-day-transition';
+  static const String keyCalendarTwelveHourClock =
+      'key-calendar-twelve-hour-clock';
   static const String keySelectedCity = 'key-selected-city';
   static const String keyCalendarEvents = 'key-calendar-events';
   static const String keyCopyWithHeaders = 'key-copy-with-headers';
@@ -242,7 +245,7 @@ class SettingsRepository {
     keyFollowSystemTheme,
     keySwatchColor,
     keyDarkSwatchColor,
-    keyTextMaxWidth,
+    keyTextColumnWidth,
     keyFontSize,
     keyFontFamily,
     keyCommentatorsFontFamily,
@@ -275,6 +278,7 @@ class SettingsRepository {
     keyCommentaryPaneWidth,
     keyCalendarType,
     keyCalendarDayTransition,
+    keyCalendarTwelveHourClock,
     keySelectedCity,
     keyCalendarEvents,
     keyCopyWithHeaders,
@@ -385,8 +389,8 @@ class SettingsRepository {
         ),
       ),
       'textMaxWidth': _settings.getValue<double>(
-        keyTextMaxWidth,
-        defaultValue: -1,
+        keyTextColumnWidth,
+        defaultValue: 0,
       ),
       'fontSize': _settings.getValue<double>(keyFontSize, defaultValue: 25),
       'fontFamily': _settings.getValue<String>(
@@ -480,6 +484,10 @@ class SettingsRepository {
       'calendarDayTransition': _settings.getValue<String>(
         keyCalendarDayTransition,
         defaultValue: 'sunset',
+      ),
+      'calendarTwelveHourClock': _settings.getValue<bool>(
+        keyCalendarTwelveHourClock,
+        defaultValue: false,
       ),
       'selectedCity': _settings.getValue<String>(
         keySelectedCity,
@@ -678,7 +686,7 @@ class SettingsRepository {
   }
 
   Future<void> updateTextMaxWidth(double value) async {
-    await _settings.setValue(keyTextMaxWidth, value);
+    await _settings.setValue(keyTextColumnWidth, value);
   }
 
   Future<void> updateFontSize(double value) async {
@@ -818,6 +826,10 @@ class SettingsRepository {
 
   Future<void> updateCalendarDayTransition(String value) async {
     await _settings.setValue(keyCalendarDayTransition, value);
+  }
+
+  Future<void> updateCalendarTwelveHourClock(bool value) async {
+    await _settings.setValue(keyCalendarTwelveHourClock, value);
   }
 
   Future<void> updateSelectedCity(String value) async {
@@ -1198,7 +1210,7 @@ class SettingsRepository {
       keyDarkSwatchColor,
       AppSeedColors.defaultDark.toARGB32(),
     );
-    await _settings.setValue(keyTextMaxWidth, -1.0);
+    await _settings.setValue(keyTextColumnWidth, 0.0);
     await _settings.setValue(keyFontSize, 25.0);
     await _settings.setValue(keyFontFamily, AppFonts.defaultFont);
     await _settings.setValue(
@@ -1225,6 +1237,7 @@ class SettingsRepository {
     await _settings.setValue(keyCommentaryPaneWidth, 400.0);
     await _settings.setValue(keyCalendarType, 'combined');
     await _settings.setValue(keyCalendarDayTransition, 'sunset');
+    await _settings.setValue(keyCalendarTwelveHourClock, false);
     await _settings.setValue(keySelectedCity, 'ירושלים');
     await _settings.setValue(keyCalendarEvents, '[]');
     await _settings.setValue(keyCopyWithHeaders, 'none');

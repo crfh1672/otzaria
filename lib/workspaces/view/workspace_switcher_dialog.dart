@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:otzaria/theme/app_tokens.dart';
+import 'package:otzaria/theme/app_surfaces.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:otzaria/widgets/dialogs/app_dialog_frame.dart';
 import 'package:otzaria/workspaces/bloc/workspace_bloc.dart';
 import 'package:otzaria/workspaces/bloc/workspace_event.dart';
 import 'package:otzaria/workspaces/bloc/workspace_state.dart';
@@ -17,6 +19,7 @@ import 'package:otzaria/tools/calendar/helpers/calendar_date_helpers.dart';
 import 'package:otzaria/core/ui_snack.dart';
 import 'package:otzaria/core/messages/notes_messages.dart';
 import 'package:otzaria/widgets/text/rtl_text_field.dart';
+import 'package:otzaria_icons/otzaria_icons.dart';
 
 class WorkspaceSwitcherDialog extends StatefulWidget {
   const WorkspaceSwitcherDialog({super.key});
@@ -45,89 +48,65 @@ class _WorkspaceSwitcherDialogState extends State<WorkspaceSwitcherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'שולחנות עבודה',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(FluentIcons.dismiss_24_regular),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: BlocBuilder<WorkspaceBloc, WorkspaceState>(
-                builder: (context, state) {
-                  if (state.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+    final size = MediaQuery.of(context).size;
+    return AppDialogFrame(
+      title: 'שולחנות עבודה',
+      icon: OtzariaIcons.lectern_24_regular,
+      width: size.width * 0.8,
+      height: size.height * 0.8,
+      backgroundColor: AppSurfaces.panelBackground(context),
+      child: BlocBuilder<WorkspaceBloc, WorkspaceState>(
+        builder: (context, state) {
+          if (state.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-                  if (state.error != null) {
-                    return Center(
-                      child: Text(
-                        'שגיאה: ${state.error}',
-                      ),
+          if (state.error != null) {
+            return Center(
+              child: Text(
+                'שגיאה: ${state.error}',
+              ),
+            );
+          }
+
+          final liveTabs = context.select(
+            (TabsBloc bloc) => bloc.state.tabs,
+          );
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // מספר עמודות לפי הרוחב הזמין; במסך צר יורד ל-1-2 עמודות
+              final crossAxisCount = (constraints.maxWidth / 200).floor().clamp(
+                1,
+                3,
+              );
+              return GridView.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 1.2,
+                ),
+                itemCount: state.workspaces.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == state.workspaces.length) {
+                    // "New Workspace" tile
+                    return _buildNewWorkspaceTile(context);
+                  } else {
+                    // Workspace tile
+                    final workspace = state.workspaces[index];
+                    final isActive = state.activeWorkspaceId == workspace.id;
+                    return _buildWorkspaceTile(
+                      context,
+                      workspace,
+                      state.tabsOf(workspace, liveTabs),
+                      isActive,
                     );
                   }
-
-                  final liveTabs = context.select(
-                    (TabsBloc bloc) => bloc.state.tabs,
-                  );
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      // מספר עמודות לפי הרוחב הזמין; במסך צר יורד ל-1-2 עמודות
-                      final crossAxisCount = (constraints.maxWidth / 200)
-                          .floor()
-                          .clamp(1, 3);
-                      return GridView.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.2,
-                        ),
-                        itemCount: state.workspaces.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == state.workspaces.length) {
-                            // "New Workspace" tile
-                            return _buildNewWorkspaceTile(context);
-                          } else {
-                            // Workspace tile
-                            final workspace = state.workspaces[index];
-                            final isActive =
-                                state.activeWorkspaceId == workspace.id;
-                            return _buildWorkspaceTile(
-                              context,
-                              workspace,
-                              state.tabsOf(workspace, liveTabs),
-                              isActive,
-                            );
-                          }
-                        },
-                      );
-                    },
-                  );
                 },
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -157,13 +136,15 @@ class _WorkspaceSwitcherDialogState extends State<WorkspaceSwitcherDialog> {
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: AppTokens.borderRadiusAll,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     FluentIcons.add_24_regular,
                     size: 48,
-                    color: Colors.grey,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -247,7 +228,7 @@ class _WorkspaceSwitcherDialogState extends State<WorkspaceSwitcherDialog> {
                             ).colorScheme.primary.withValues(alpha: 0.1),
                       borderRadius: AppTokens.borderRadiusAll,
                     ),
-                    child: _buildWorkspacePreview(tabs),
+                    child: _buildWorkspacePreview(context, tabs, isActive),
                   ),
                 ),
                 Padding(
@@ -337,25 +318,34 @@ class _WorkspaceSwitcherDialogState extends State<WorkspaceSwitcherDialog> {
     UiSnack.show(NotesMessages.workspaceSnapshotSaved);
   }
 
-  Widget _buildWorkspacePreview(List<OpenedTab> tabs) {
+  Widget _buildWorkspacePreview(
+    BuildContext context,
+    List<OpenedTab> tabs,
+    bool isActive,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final color = isActive ? cs.onPrimary : cs.primary;
+    final preview = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(OtzariaIcons.lectern_24_filled, size: 44, color: color),
+        if (tabs.isNotEmpty) ...[
+          const SizedBox(height: AppTokens.spaceXS),
+          Text(
+            tabs.length == 1 ? 'כרטיסייה אחת' : '${tabs.length} כרטיסיות',
+            style: TextStyle(fontSize: AppTokens.fontSM, color: color),
+          ),
+        ],
+      ],
+    );
     return Center(
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: tabs.map((tab) {
-          return Tooltip(
-            message: tab.title,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: AppTokens.borderRadiusAll,
-              ),
+      // שמות הכרטיסיות נשארים זמינים בריחוף, כמו שהיו בריבועים שהוחלפו.
+      child: tabs.isEmpty
+          ? preview
+          : Tooltip(
+              message: tabs.map((tab) => tab.title).join('\n'),
+              child: preview,
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 }
@@ -400,7 +390,8 @@ class _WorkspaceNameFieldState extends State<_WorkspaceNameField> {
       );
     }
     setState(() => _isEditing = false);
-    FocusManager.instance.primaryFocus?.unfocus();
+    // הפוקוס חוזר לכרטיס השולחן שמכיל את השדה, כך ש-Enter נוסף פותח אותו.
+    Focus.maybeOf(context, createDependency: false)?.requestFocus();
   }
 
   @override
@@ -413,7 +404,6 @@ class _WorkspaceNameFieldState extends State<_WorkspaceNameField> {
               controller: _controller,
               autofocus: true,
               decoration: const InputDecoration(
-                border: OutlineInputBorder(),
                 isDense: true,
               ),
               onSubmitted: (_) => _commitRenameAndClose(),

@@ -1,8 +1,12 @@
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:otzaria/core/external_uri_router.dart';
+import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
 import 'package:otzaria/theme/app_tokens.dart';
 import 'package:otzaria/personal_notes/models/personal_note.dart';
 import 'package:otzaria/widgets/controls/action_buttons.dart';
+import 'package:otzaria/widgets/controls/segmented_control.dart';
+import 'package:otzaria/widgets/dialogs/app_dialog_frame.dart';
 import 'package:otzaria/widgets/text/rtl_text_field.dart';
 
 class PersonalNoteLinkTarget {
@@ -61,7 +65,6 @@ class _PersonalNoteLinkDialogState extends State<PersonalNoteLinkDialog> {
     controller: _labelController,
     decoration: const InputDecoration(
       labelText: 'טקסט לקישור (אופציונלי)',
-      border: OutlineInputBorder(),
       isDense: true,
     ),
   );
@@ -112,40 +115,41 @@ class _PersonalNoteLinkDialogState extends State<PersonalNoteLinkDialog> {
           note.id.toLowerCase().contains(query);
     }).toList();
 
-    return AlertDialog(
-      title: const Text('הוסף קישור'),
-      content: SizedBox(
-        width: 460,
+    return AppDialogFrame(
+      title: 'הוסף קישור',
+      icon: FluentIcons.link_24_regular,
+      width: 460,
+      actions: [
+        ActionButton.neutral(
+          text: 'ביטול',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        ActionButton.recommended(
+          text: 'הוסף',
+          onPressed: _submit,
+        ),
+      ],
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ToggleButtons(
-              isSelected: [
-                _selectedTab == 0,
-                _selectedTab == 1,
-                _selectedTab == 2,
+            AppSegmentedControl<int>(
+              options: const [
+                SegmentOption(value: 0, label: 'קישור לספר'),
+                SegmentOption(value: 1, label: 'קישור להערה'),
+                SegmentOption(value: 2, label: 'הדבקת קישור'),
               ],
-              onPressed: (index) {
+              currentValue: _selectedTab,
+              expandToFillWidth: true,
+              onChanged: (index) {
                 setState(() {
                   _selectedTab = index;
                   _labelController.clear();
                   _urlError = null;
                 });
               },
-              borderRadius: AppTokens.borderRadiusAll,
-              children: [
-                for (final label in const [
-                  'קישור לספר',
-                  'קישור להערה',
-                  'הדבקת קישור',
-                ])
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(label),
-                  ),
-              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppTokens.spaceMD),
             if (_selectedTab == 2)
               Column(
                 children: [
@@ -156,7 +160,6 @@ class _PersonalNoteLinkDialogState extends State<PersonalNoteLinkDialog> {
                     decoration: InputDecoration(
                       labelText: 'כתובת הקישור',
                       hintText: 'otzaria://open/book/2156 או https://...',
-                      border: const OutlineInputBorder(),
                       isDense: true,
                       errorText: _urlError,
                     ),
@@ -165,7 +168,7 @@ class _PersonalNoteLinkDialogState extends State<PersonalNoteLinkDialog> {
                     },
                     onSubmitted: (_) => _submit(),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTokens.spaceMD),
                   _buildLabelField(),
                 ],
               )
@@ -177,11 +180,10 @@ class _PersonalNoteLinkDialogState extends State<PersonalNoteLinkDialog> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'מספר שורה',
-                      border: OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTokens.spaceMD),
                   _buildLabelField(),
                 ],
               )
@@ -192,55 +194,49 @@ class _PersonalNoteLinkDialogState extends State<PersonalNoteLinkDialog> {
                     controller: _searchController,
                     decoration: const InputDecoration(
                       labelText: 'חיפוש הערה',
-                      border: OutlineInputBorder(),
                       isDense: true,
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTokens.spaceMD),
                   SizedBox(
                     height: 220,
-                    child: ListView.builder(
-                      itemCount: filteredNotes.length,
-                      itemBuilder: (context, index) {
-                        final note = filteredNotes[index];
-                        final selected = note.id == _selectedNote?.id;
-                        return ListTile(
-                          title: Text(
-                            note.displayTitle?.trim().isNotEmpty == true
-                                ? note.displayTitle!
-                                : note.contentPlain,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            note.contentPlain,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          selected: selected,
-                          onTap: () => setState(() => _selectedNote = note),
-                        );
-                      },
+                    child: ListDialogCard(
+                      child: ListView.builder(
+                        itemCount: filteredNotes.length,
+                        itemBuilder: (context, index) {
+                          final note = filteredNotes[index];
+                          final selected = note.id == _selectedNote?.id;
+                          return ListTile(
+                            shape: Border(
+                              bottom: listDialogRowDivider(context),
+                            ),
+                            title: Text(
+                              note.displayTitle?.trim().isNotEmpty == true
+                                  ? note.displayTitle!
+                                  : note.contentPlain,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              note.contentPlain,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            selected: selected,
+                            onTap: () => setState(() => _selectedNote = note),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTokens.spaceMD),
                   _buildLabelField(),
                 ],
               ),
           ],
         ),
       ),
-      actions: [
-        ActionButton.neutral(
-          text: 'ביטול',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        ActionButton.recommended(
-          text: 'הוסף',
-          onPressed: _submit,
-        ),
-      ],
     );
   }
 }

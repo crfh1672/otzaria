@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,35 +130,102 @@ void main() {
 
     expect(find.text('מה חדש בספרים'), findsOneWidget);
     expect(find.text('גרסת ספרייה 35'), findsOneWidget);
-    final item = find.text('• ספרות/הלכה/ספר 0');
+    final item = find.text('ספרות/הלכה/ספר 0');
     expect(item, findsOneWidget);
     expect(
       Directionality.of(tester.element(item)),
       TextDirection.rtl,
     );
     // ListView עצל: אלפי הפריטים אינם נבנים מראש.
-    expect(find.text('• ספרות/הלכה/ספר 5999'), findsNothing);
+    expect(find.text('ספרות/הלכה/ספר 5999'), findsNothing);
 
     await tester.dragUntilVisible(
-      find.text('• ספרות/הלכה/ספר 200'),
+      find.text('ספרות/הלכה/ספר 200'),
       find.byType(SuperListView),
       const Offset(0, -500),
     );
-    expect(find.text('• ספרות/הלכה/ספר 200'), findsOneWidget);
-    expect(find.text('• ספרות/הלכה/ספר 0'), findsNothing);
+    expect(find.text('ספרות/הלכה/ספר 200'), findsOneWidget);
+    expect(find.text('ספרות/הלכה/ספר 0'), findsNothing);
 
     await tester.enterText(find.byType(EditableText), 'ספר 5999');
     await tester.pump();
-    expect(find.text('• ספרות/הלכה/ספר 5999'), findsNothing);
+    expect(find.text('ספרות/הלכה/ספר 5999'), findsNothing);
     await tester.pump(LibraryChangesDialog.searchDebounce);
     await tester.pumpAndSettle();
-    expect(find.text('• ספרות/הלכה/ספר 5999'), findsOneWidget);
+    expect(find.text('ספרות/הלכה/ספר 5999'), findsOneWidget);
     expect(find.text('גרסת ספרייה 34'), findsNothing);
 
     await tester.tap(find.text('סגור'));
     await tester.pumpAndSettle();
     expect(find.text('מה חדש בספרים'), findsNothing);
   });
+
+  testWidgets(
+    'גרירת פס הגלילה בעכבר גוללת את הרשימה (issue #3321)',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _app(
+          Builder(
+            builder: (context) => Center(
+              child: TextButton(
+                onPressed: () => showLibraryChangesDialog(context, [
+                  _note('v35-1', _notes(35, 100)),
+                ]),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      ScrollPosition position() => Scrollable.of(
+        tester.element(find.text('ספרות/הלכה/ספר 0')),
+      ).position;
+      final list = find.byType(SuperListView);
+      final bar = tester.getRect(
+        find.ancestor(of: list, matching: find.byType(Scrollbar)).first,
+      );
+      // ה-thumb בקצה הסוף של הרשימה (שמאל ב-RTL), ובראשה כל עוד לא נגללה.
+      final rtl = Directionality.of(tester.element(list)) == TextDirection.rtl;
+      final thumb = Offset(rtl ? bar.left + 4 : bar.right - 4, bar.top + 10);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: bar.center);
+
+      Future<void> dragThumb() async {
+        // ריחוף מעל הפס מציג אותו; בלי זה הוא שקוף ואינו נתפס.
+        await mouse.moveTo(thumb);
+        await tester.pumpAndSettle();
+        await mouse.down(thumb);
+        await tester.pump();
+        await mouse.moveBy(const Offset(0, 100));
+        await tester.pump();
+        await mouse.up();
+        await tester.pumpAndSettle();
+      }
+
+      final first = position();
+      await dragThumb();
+      expect(first.pixels, greaterThan(100));
+
+      // סינון בונה רשימה חדשה (מפתח לכל סינון) שמתחברת לאותו בקר.
+      await tester.enterText(find.byType(EditableText), 'ספרות');
+      await tester.pump(LibraryChangesDialog.searchDebounce);
+      await tester.pumpAndSettle();
+      final filtered = position();
+      expect(filtered, isNot(same(first)));
+      expect(filtered.pixels, 0);
+      await dragThumb();
+      expect(filtered.pixels, greaterThan(100));
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
 
   testWidgets('קפיצה לסוף הרשימה לא בונה את כל השורות שבדרך (#3022)', (
     tester,
@@ -188,7 +256,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final position = Scrollable.of(
-      tester.element(find.text('• ספרות/הלכה/ספר 0')),
+      tester.element(find.text('ספרות/הלכה/ספר 0')),
     ).position;
     var builtLines = 0;
     debugOnRebuildDirtyWidget = (element, _) {
@@ -203,7 +271,7 @@ void main() {
     expect(builtLines, lessThan(200));
     expect(
       find.text(
-        '• תנך/תורה/בראשית - שינוי מהדורה ל-מהדורה ב (שונה גם מיקומו/שמו)',
+        'תנך/תורה/בראשית - שינוי מהדורה ל-מהדורה ב (שונה גם מיקומו/שמו)',
       ),
       findsOneWidget,
     );

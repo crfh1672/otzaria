@@ -26,7 +26,7 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationShouldHandleReopen(
     _ sender: NSApplication, hasVisibleWindows flag: Bool
   ) -> Bool {
-    if flag { return true }
+    if flag && !OtzariaWindowManager.shared.hidesAfterFullScreen { return true }
     // רק Dart יודע איזה חלון נסגר אחרון. אם לא שחזר — מציגים את הראשי.
     let askedDart = OtzariaViewWindows.shared.requestReopen {
       OtzariaWindowManager.shared.showMainWindow()
@@ -115,6 +115,7 @@ class AppDelegate: FlutterAppDelegate {
 
     return appSupportDirectory
       .appendingPathComponent("otzaria", isDirectory: true)
+      .appendingPathComponent("external_activations", isDirectory: true)
       .appendingPathComponent(externalActivationQueueFileName, isDirectory: false)
   }
 }

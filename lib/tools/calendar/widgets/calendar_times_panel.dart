@@ -514,6 +514,7 @@ class _CalendarTimesPanelState extends State<CalendarTimesPanel> {
                 child: _ZmanCard(
                   timeData: timeData,
                   zmanAlerts: widget.state.zmanAlerts,
+                  twelveHourClock: widget.state.twelveHourClock,
                 ),
               ),
           ],
@@ -598,7 +599,10 @@ class _CalendarTimesPanelState extends State<CalendarTimesPanel> {
         final result = await showZmanAlertDialog(
           context,
           zmanName: 'ספירת העומר',
-          timeLabel: timeLabel,
+          timeLabel: zmanim_helpers.zmanTimeForDisplay(
+            timeLabel,
+            twelveHourClock: widget.state.twelveHourClock,
+          ),
           initialMinutesBefore: existingAlert?.minutesBefore ?? 60,
           isEnabled: existingAlert != null,
         );
@@ -639,7 +643,6 @@ class _CityDropdown extends StatelessWidget {
         enableSearch: true,
         decoration: const InputDecoration(
           labelText: 'עיר',
-          border: OutlineInputBorder(),
           isDense: true,
         ),
         entries: cityNames
@@ -677,11 +680,18 @@ String _formatAlertMinutes(int minutes) {
 class _ZmanCard extends StatelessWidget {
   final CalendarTimeEntry timeData;
   final Map<String, ZmanAlertPreference?> zmanAlerts;
+  final bool twelveHourClock;
 
   const _ZmanCard({
     required this.timeData,
     required this.zmanAlerts,
+    required this.twelveHourClock,
   });
+
+  String _display(String text) => zmanim_helpers.zmanTimeForDisplay(
+    text,
+    twelveHourClock: twelveHourClock,
+  );
 
   ZmanAlertPreference? get _existingAlert {
     final direct = zmanAlerts[timeData.id];
@@ -723,7 +733,7 @@ class _ZmanCard extends StatelessWidget {
       children: [
         Expanded(
           child: _CompositeLabelValue(
-            text: text,
+            text: _display(text),
             textColor: textColor,
             titleAtStart: titleAtStart,
           ),
@@ -893,7 +903,7 @@ class _ZmanCard extends StatelessWidget {
                                 if (timeData.trailingLabel != null)
                                   Expanded(
                                     child: _CompositeLabelValue(
-                                      text: timeData.trailingLabel!,
+                                      text: _display(timeData.trailingLabel!),
                                       textColor: secondaryTextColor,
                                       titleAtStart: true,
                                     ),
@@ -904,7 +914,7 @@ class _ZmanCard extends StatelessWidget {
                                 if (timeData.leadingLabel != null)
                                   Expanded(
                                     child: _CompositeLabelValue(
-                                      text: timeData.leadingLabel!,
+                                      text: _display(timeData.leadingLabel!),
                                       textColor: secondaryTextColor,
                                       titleAtStart: false,
                                     ),
@@ -912,7 +922,7 @@ class _ZmanCard extends StatelessWidget {
                               ],
                             )
                           : Text(
-                              timeData.time,
+                              _display(timeData.time),
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
@@ -960,7 +970,7 @@ class _ZmanCard extends StatelessWidget {
     final result = await showZmanAlertDialog(
       context,
       zmanName: option.name,
-      timeLabel: option.time,
+      timeLabel: _display(option.time),
       initialMinutesBefore: existingAlert?.minutesBefore ?? 5,
       isEnabled: existingAlert != null,
     );

@@ -82,7 +82,7 @@ class TextSettingsTab extends StatelessWidget {
       subtitle: 'רוחב מקסימלי של עמודת הטקסט',
       tab: SettingsTab.text,
       cardId: 'text.font',
-      keywords: ['רוחב', 'עמודה'],
+      keywords: ['רוחב', 'עמודה', 'סנטימטר'],
     ),
     SettingsSearchEntry(
       id: 'text.font.continuous_reading',
@@ -602,46 +602,22 @@ class _FontSizeSliderState extends State<_FontSizeSlider> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            RtlIcon(widget.icon),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.label,
-                style: kSettingsTitleStyle,
-              ),
-            ),
-            Text(
-              widget.divisions != null
-                  ? _currentValue.toStringAsFixed(1)
-                  : _currentValue.toStringAsFixed(0),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        Slider(
-          value: _currentValue,
-          min: widget.min,
-          max: widget.max,
-          divisions: widget.divisions ?? (widget.max - widget.min).toInt(),
-          label: widget.divisions != null
-              ? _currentValue.toStringAsFixed(1)
-              : _currentValue.toStringAsFixed(0),
-          onChanged: (value) {
-            setState(() => _currentValue = value);
-            if (widget.applyWhileDragging) widget.onChanged(value);
-          },
-          onChangeEnd: widget.applyWhileDragging ? null : widget.onChanged,
-        ),
-      ],
+    final valueLabel = widget.divisions != null
+        ? _currentValue.toStringAsFixed(1)
+        : _currentValue.toStringAsFixed(0);
+    return SettingsSliderTile(
+      icon: widget.icon,
+      title: widget.label,
+      valueLabel: valueLabel,
+      value: _currentValue,
+      min: widget.min,
+      max: widget.max,
+      divisions: widget.divisions ?? (widget.max - widget.min).toInt(),
+      onChanged: (value) {
+        setState(() => _currentValue = value);
+        if (widget.applyWhileDragging) widget.onChanged(value);
+      },
+      onChangeEnd: widget.applyWhileDragging ? null : widget.onChanged,
     );
   }
 }
@@ -718,88 +694,62 @@ class _TextWidthSlider extends StatefulWidget {
 }
 
 class _TextWidthSliderState extends State<_TextWidthSlider> {
-  int? _draggedLevel;
+  // תצוגה בס"מ משוערים לפי 96 DPI; נשמר בפיקסלים לוגיים.
+  static const double _pxPerCm = 96 / 2.54;
+  static const int _minCm = 10;
+  static const int _maxCm = 40;
+  static const int _fullStop = _maxCm + 1;
+
+  int? _draggedStop;
 
   @override
   void didUpdateWidget(_TextWidthSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.state.textMaxWidth != widget.state.textMaxWidth) {
-      _draggedLevel = null;
+      _draggedStop = null;
     }
   }
 
   void _apply(double value) {
-    // נשמר כרמה שלילית (-level) כדי שהאחוז יחושב מרוחב
-    // עמודת הטקסט בפועל, לא מרוחב המסך בזמן השמירה
-    final level = value.toInt();
+    final stop = value.round();
     context.read<SettingsBloc>().add(
-      UpdateTextMaxWidth(level == 0 ? 0 : -level.toDouble()),
+      UpdateTextMaxWidth(stop >= _fullStop ? 0 : stop * _pxPerCm),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentMaxWidth = widget.state.textMaxWidth;
+    final stored = widget.state.textMaxWidth;
+    final storedStop = stored <= 0
+        ? _fullStop
+        : (stored / _pxPerCm).round().clamp(_minCm, _maxCm);
+    final currentStop = _draggedStop ?? storedStop;
+    final isFull = currentStop >= _fullStop;
+    final description = isFull
+        ? context.settingsText('מלא')
+        : context.settingsText('{cm} ס"מ', args: {'cm': currentStop});
 
-    // ערך חיובי (פיקסלים) הוא פורמט ישן — מומר לרמה לפי רוחב המסך הנוכחי
-    int currentLevel;
-    if (currentMaxWidth < 0) {
-      currentLevel = (-currentMaxWidth).toInt();
-    } else if (currentMaxWidth == 0) {
-      currentLevel = 0;
-    } else {
-      final ratio = currentMaxWidth / MediaQuery.of(context).size.width;
-      currentLevel = ((1.0 - ratio) / 0.05).round().clamp(0, 14);
-    }
-    currentLevel = _draggedLevel ?? currentLevel;
-
-    String getLevelDescription(int level) {
-      if (level == 0) return context.settingsText('מלא');
-      final percent = 100 - (level * 5);
-      return '$percent%';
-    }
-
-    return Column(
-      children: [
-        ListTile(
-          leading: const RtlIcon(FluentIcons.text_align_distributed_24_regular),
-          title: Text(
-            context.settingsText('רוחב הטקסט'),
-            style: kSettingsTitleStyle,
-          ),
-          subtitle: Text(
-            context.settingsText(
-              currentLevel == 0
-                  ? 'הטקסט ימלא את כל הרוחב הזמין'
-                  : 'הטקסט יהיה צר יותר ומרוכז במסך',
-            ),
-            style: kSettingsSubtitleStyle,
-          ),
-          trailing: Text(
-            getLevelDescription(currentLevel),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: SettingsSliderTile(
+        icon: FluentIcons.text_align_distributed_24_regular,
+        title: context.settingsText('רוחב הטקסט'),
+        subtitle: context.settingsText(
+          isFull
+              ? 'הטקסט ימלא את כל הרוחב הזמין'
+              : 'רוחב קבוע, מצטמצם רק כשאין מקום',
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Slider(
-            value: currentLevel.toDouble(),
-            min: 0,
-            max: 14,
-            divisions: 14,
-            label: getLevelDescription(currentLevel),
-            onChanged: (value) {
-              setState(() => _draggedLevel = value.toInt());
-              if (widget.applyWhileDragging) _apply(value);
-            },
-            onChangeEnd: widget.applyWhileDragging ? null : _apply,
-          ),
-        ),
-      ],
+        valueLabel: description,
+        value: currentStop.toDouble(),
+        min: _minCm.toDouble(),
+        max: _fullStop.toDouble(),
+        divisions: _fullStop - _minCm,
+        onChanged: (value) {
+          setState(() => _draggedStop = value.round());
+          if (widget.applyWhileDragging) _apply(value);
+        },
+        onChangeEnd: widget.applyWhileDragging ? null : _apply,
+      ),
     );
   }
 }

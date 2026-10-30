@@ -2,6 +2,9 @@
 // - מסך רחב (≥840): פריסה זה-לצד-זה (AdaptiveSidePane).
 // - מסך צר (<600): פריסה מוערמת — לוח למעלה, חלונית זמנים/אירועים למטה.
 
+import 'dart:async';
+
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
@@ -15,13 +18,19 @@ import 'package:otzaria/settings/engine/settings_event.dart';
 import 'package:otzaria/settings/engine/settings_repository.dart';
 import 'package:otzaria/tools/calendar/calendar_screen.dart';
 import 'package:otzaria/tools/calendar/dialogs/calendar_zman_alert_dialog.dart';
+import 'package:otzaria/tools/calendar/dialogs/zmanim_settings_dialog.dart';
+import 'package:otzaria/tools/calendar/helpers/zmanim_helpers.dart';
 import 'package:otzaria/tools/calendar/services/google_calendar_service.dart';
 import 'package:otzaria/tools/calendar/services/notification_service.dart';
 import 'package:otzaria/tools/calendar/widgets/calendar_main_panel.dart';
 import 'package:otzaria/tools/calendar/widgets/calendar_side_panel.dart';
 import 'package:otzaria/tools/calendar/widgets/calendar_times_panel.dart';
+import 'package:otzaria/widgets/text/otzaria_search_field.dart';
 
 import '../../test_helpers/memory_cache_provider.dart';
+
+class _MockCalendarCubit extends MockCubit<CalendarState>
+    implements CalendarCubit {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +58,11 @@ void main() {
     await settingsBloc.close();
   });
 
-  Future<void> pumpCalendar(WidgetTester tester, Size size) async {
+  Future<void> pumpCalendar(
+    WidgetTester tester,
+    Size size, {
+    TextDirection textDirection = TextDirection.ltr,
+  }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -59,19 +72,55 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: MultiBlocProvider(
-            providers: [
-              BlocProvider.value(value: settingsBloc),
-              BlocProvider.value(value: calendarCubit),
-            ],
-            child: const CalendarWidget(),
+        home: Directionality(
+          textDirection: textDirection,
+          child: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: settingsBloc),
+                BlocProvider.value(value: calendarCubit),
+              ],
+              child: const CalendarWidget(),
+            ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('טבלת זמנים נוספים שומרת מעבר בין שעון 12 ל-24 שעות', (
+    tester,
+  ) async {
+    final tableCubit = _MockCalendarCubit();
+    final updates = StreamController<CalendarState>();
+    const clock = '\u206605:30\u2069';
+    final initial = CalendarState.initial().copyWith(
+      dailyTimes: {kZmanimRegistry.first.id: clock},
+      twelveHourClock: true,
+    );
+    whenListen(tableCubit, updates.stream, initialState: initial);
+    final twelve = zmanTimeForDisplay(clock, twelveHourClock: true);
+    expect(twelve, contains('AM'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider<CalendarCubit>.value(
+          value: tableCubit,
+          child: const Scaffold(body: Center(child: ZmanimSettingsContent())),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(twelve), findsWidgets);
+    updates.add(initial.copyWith(twelveHourClock: false));
+    await tester.pumpAndSettle();
+    expect(find.text(clock), findsWidgets);
+    expect(find.text(twelve), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await updates.close();
+    await tableCubit.close();
+  });
 
   group('CalendarWidget — פריסה רספונסיבית', () {
     testWidgets('מסך צר (<600): הלוח למעלה והחלונית למטה (מוערם)', (
@@ -145,6 +194,69 @@ void main() {
         greaterThan(100),
         reason: 'במסך רחב הפאנלים אמורים להיות מופרדים אופקית.',
       );
+    });
+  });
+
+  // בחלון בינוני (600–840) חלונית הזמנים/האירועים צפה מעל הלוח, וכפתור הסגירה
+  // שלה ישב מעל הפקד הראשון שבה (issue #3290).
+  group('חלונית צפה: כפתור הסגירה לא מכסה פקדים (issue #3290)', () {
+    const mediumSize = Size(720, 900);
+
+    Rect closeButtonRect(WidgetTester tester) =>
+        tester.getRect(find.byTooltip('סגור חלונית'));
+
+    testWidgets('זמנים: לחיצה על "זמנים נוספים" פותחת את הטבלה', (
+      tester,
+    ) async {
+      await pumpCalendar(
+        tester,
+        mediumSize,
+        textDirection: TextDirection.rtl,
+      );
+      await tester.tap(find.byTooltip('זמנים'));
+      await tester.pumpAndSettle();
+
+      final moreTimes = find.byTooltip('זמנים נוספים');
+      await tester.tap(moreTimes, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(ZmanimSettingsContent),
+        findsOneWidget,
+        reason: 'הלחיצה מגיעה לכפתור ולא לכפתור הסגירה שמעליו',
+      );
+      expect(
+        closeButtonRect(tester).overlaps(tester.getRect(moreTimes)),
+        isFalse,
+      );
+    });
+
+    testWidgets('אירועים: לחיצה על תחילת שדה החיפוש מתמקדת בו', (
+      tester,
+    ) async {
+      await pumpCalendar(
+        tester,
+        mediumSize,
+        textDirection: TextDirection.rtl,
+      );
+      await tester.tap(find.byTooltip('אירועים'));
+      await tester.pumpAndSettle();
+
+      final searchField = find.byType(OtzariaSearchField);
+      final fieldRect = tester.getRect(searchField);
+      // ב-RTL תחילת השדה בצדו הימני.
+      await tester.tapAt(Offset(fieldRect.right - 12, fieldRect.center.dy));
+      await tester.pump();
+
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: searchField, matching: find.byType(EditableText)),
+      );
+      expect(
+        editable.focusNode.hasFocus,
+        isTrue,
+        reason: 'הלחיצה מגיעה לשדה ולא לכפתור הסגירה שמעליו',
+      );
+      expect(closeButtonRect(tester).overlaps(fieldRect), isFalse);
     });
   });
 

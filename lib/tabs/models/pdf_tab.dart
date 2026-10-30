@@ -31,11 +31,20 @@ class PdfBookTab extends OpenedTab {
   PdfViewerController pdfViewerController = PdfViewerController();
   final navigationHistory = PdfLocationHistory();
 
-  /// האם הדף רחב מהתצוגה (זום מוגדל), כך שיש לאן לגלול לרוחב.
+  /// האם הדפים הנראים רחבים מהתצוגה, כך שנדרשת הזזה אופקית.
+  /// סטייה בתוך השוליים אינה זום; סבילות של פיקסל מונעת שגיאות עיגול.
   bool get canPanHorizontally {
     final controller = pdfViewerController;
-    return controller.isReady &&
-        controller.visibleRect.width < controller.documentSize.width - 1;
+    if (!controller.isReady) return false;
+    final view = controller.visibleRect;
+    Rect? shown;
+    for (final page in controller.layout.pageLayouts) {
+      if (page.top < view.bottom && page.bottom > view.top) {
+        shown = shown?.expandToInclude(page) ?? page;
+      }
+    }
+    return shown != null &&
+        shown.width > view.width + 1 / controller.currentZoom;
   }
 
   final outline = ValueNotifier<List<PdfOutlineNode>?>(null);
@@ -54,7 +63,6 @@ class PdfBookTab extends OpenedTab {
   /// טווח הקרבה ומצב התאמת המילים שבהם נמצאה התוצאה — ראו [SearchMatchPolicy].
   SearchMatchPolicy matchPolicy;
 
-  List<PdfTextSearchResult>? pdfSearchMatches;
   int? pdfSearchCurrentMatchIndex;
 
   /// תצורת חיפוש חיצונית שממתינה להחלה בחלונית החיפוש.
@@ -141,7 +149,6 @@ class PdfBookTab extends OpenedTab {
     this.searchMode = SearchMode.exact,
     this.searchDistance = 0,
     this.matchPolicy = SearchMatchPolicy.standard,
-    this.pdfSearchMatches,
     this.pdfSearchCurrentMatchIndex,
     super.isPinned,
     super.dedupeKey,

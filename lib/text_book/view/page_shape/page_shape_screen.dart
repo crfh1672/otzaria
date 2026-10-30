@@ -25,6 +25,7 @@ import 'package:otzaria/text_book/view/page_shape/utils/page_shape_plugin_api.da
 import 'package:otzaria/text_book/view/page_shape/utils/commentary_sync_helper.dart';
 import 'package:otzaria/text_book/view/page_shape/utils/page_shape_workspace_scope.dart';
 import 'package:otzaria/text_book/view/page_shape/utils/page_shape_pane_sizes.dart';
+import 'package:otzaria/text_book/view/page_shape/utils/page_shape_notes_column.dart';
 import 'package:otzaria/text_book/view/page_shape/page_shape_settings_panel.dart';
 import 'package:otzaria/text_book/view/commentary_list_base.dart';
 import 'package:otzaria/text_book/widgets/text_book_state_builder.dart';
@@ -443,15 +444,10 @@ class _PageShapeScreenState extends State<PageShapeScreen> {
     );
   }
 
-  /// "הערות" הוא מפרש וירטואלי בלי קישורים (הטור היה נפתח ונעלם), ומפרש
-  /// "נדיר" הוא בדרך כלל קישור בודד שסווג בטעות — שניהם לא מוצעים בטורים.
+  /// מפרש "נדיר" הוא בדרך כלל קישור בודד שסווג בטעות — אינו מוצע בטורים.
   List<String> _availableCommentators(TextBookLoaded state) {
     return state.availableCommentators
-        .where(
-          (title) =>
-              title != kNotesCommentatorTitle &&
-              !state.rareCommentators.contains(title),
-        )
+        .where((title) => !state.rareCommentators.contains(title))
         .toList();
   }
 
@@ -643,7 +639,10 @@ class _PageShapeScreenState extends State<PageShapeScreen> {
         availableCommentators: selectableCommentators,
         commentedBookTitle: state.book.title,
       );
-      if (resolvedSingle == null) {
+      if (resolvedSingle == null ||
+          (state.commentatorsLoaded &&
+              !isPageShapeRemainingCommentatorsValue(resolvedSingle) &&
+              !selectableCommentators.contains(resolvedSingle))) {
         return _buildEmptyColumnContent(
           columnName: 'right',
           onSelectCommentator: () => _showColumnAndOpenSettings('right'),
@@ -653,6 +652,10 @@ class _PageShapeScreenState extends State<PageShapeScreen> {
       if (!isPageShapeRemainingCommentatorsValue(resolvedSingle) &&
           !isPageShapeMultiCommentatorsValue(resolvedSingle) &&
           resolvedSingle != pageShapeMultipleCommentatorsModeValue) {
+        if (!state.commentatorsLoaded &&
+            !selectableCommentators.contains(resolvedSingle)) {
+          return const LoadingIndicator();
+        }
         return _CommentaryPane(
           column: 'right',
           commentatorName: resolvedSingle,
@@ -666,6 +669,11 @@ class _PageShapeScreenState extends State<PageShapeScreen> {
           ),
         );
       }
+    }
+
+    if (!state.commentatorsLoaded &&
+        _rightPaneSelectableCommentators(state).isEmpty) {
+      return const LoadingIndicator();
     }
 
     final commentators = _selectedRightPaneCommentators(state);
@@ -1183,8 +1191,7 @@ class _PageShapeScreenState extends State<PageShapeScreen> {
                             LayoutBuilder(
                               builder: (context, pageConstraints) {
                                 final pageMaxWidth = _applyTextMaxWidth
-                                    ? textColumnMaxWidthOf(
-                                        context,
+                                    ? resolveTextColumnMaxWidth(
                                         setting: context
                                             .select<SettingsBloc, double>(
                                               (bloc) => bloc.state.textMaxWidth,
@@ -1459,8 +1466,12 @@ class _PageShapeScreenState extends State<PageShapeScreen> {
                                                     ),
                                                   ),
                                                   if (_rightPaneSelectableCommentators(
-                                                    state,
-                                                  ).isNotEmpty) ...[
+                                                            state,
+                                                          ).isNotEmpty ||
+                                                      (_rightCommentator !=
+                                                              null &&
+                                                          !state
+                                                              .commentatorsLoaded)) ...[
                                                     SizedBox(
                                                       width: rightWidth,
                                                       child: _buildRightPane(
@@ -1890,6 +1901,8 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
   // הערות ספר המפרש: עוגניו נמדדים על השורה המלאה, עם גופי ההערות.
   BookNotes _anchorBookNotes = BookNotes.empty;
   List<({int startLine, int endLine})> _anchorLoadedRanges = const [];
+  // טור "הערות": התוכן והקישורים נגזרים מאלו, ונבנים מחדש כשהם מתחלפים.
+  (List<String>, BookNotes)? _notesColumnSource;
   int? _lastSyncedIndex; // האינדקס האחרון שסונכרן
   int? _lastSyncedMainIndex; // השורה הנבחרת שממנה נגזר הסנכרון האחרון
   int _initialSyncAttempts = 0; // ניסיונות סנכרון ראשוני עד שה-controller מחובר
@@ -2060,12 +2073,6 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // הסרנו את הקריאה מכאן כדי למנוע כפילות או בעיות context מוקדמות
-  }
-
-  @override
   void didUpdateWidget(_CommentaryPane oldWidget) {
     super.didUpdateWidget(oldWidget);
     // אם שם המפרש השתנה, טען מחדש את התוכן
@@ -2113,7 +2120,9 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
       if (state is TextBookLoaded && mounted) {
         // מסנן מחדש רק כשהקישורים עצמם השתנו (UpdateLinks),
         // ולא בכל גלילה (UpdateVisibleIndecies / UpdateSelectedIndex)
-        if (!identical(_lastLinks, state.links)) {
+        if (_isNotesColumn) {
+          _refreshNotesColumn(state);
+        } else if (!identical(_lastLinks, state.links)) {
           _lastLinks = state.links;
           _refreshRelevantLinks(state);
         }
@@ -2121,6 +2130,44 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
         _updateHighlights(state);
       }
     });
+  }
+
+  bool get _isNotesColumn => widget.commentatorName == kNotesCommentatorTitle;
+
+  /// "הערות" אינו ספר: הטור נבנה מהערות הספר הראשי עצמו.
+  void _showNotesColumn(TextBookLoaded state) {
+    final column = buildPageShapeNotesColumn(state.content, state.bookNotes);
+    _notesColumnSource = (state.content, state.bookNotes);
+    _relevantLinks = column.links;
+    // טעינת טווחי תוכן ברקע מחליפה את state.content בלי לשנות את ההערות;
+    // בנייה מחדש הייתה מאפסת את הסנכרון ומקפיצה את הטור.
+    if (!_isLoading &&
+        const ListEquality<String>().equals(_content, column.content)) {
+      return;
+    }
+    setState(() {
+      _reportBook = null;
+      _content = column.content;
+      _isLoading = false;
+      _lastSyncedIndex = null;
+      _lastSyncedMainIndex = null;
+    });
+    if (column.content.isEmpty) {
+      _notifyCommentaryLoadFailed();
+      return;
+    }
+    _updateHighlights(state);
+    _scheduleInitialSync();
+  }
+
+  void _refreshNotesColumn(TextBookLoaded state) {
+    final source = _notesColumnSource;
+    if (source == null) return;
+    if (identical(source.$2, state.bookNotes) &&
+        (identical(source.$1, state.content) || !state.bookNotes.isEmpty)) {
+      return;
+    }
+    _showNotesColumn(state);
   }
 
   void _refreshRelevantLinks(TextBookLoaded state) {
@@ -2369,10 +2416,12 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
     }
 
     // חישוב האינדקס הלוגי
-    final logicalIndex = CommentarySyncHelper.getLogicalIndex(
-      state.selectedIndex!,
-      state.content,
-    );
+    final logicalIndex = _isNotesColumn
+        ? state.selectedIndex!
+        : CommentarySyncHelper.getLogicalIndex(
+            state.selectedIndex!,
+            state.content,
+          );
     final mainLineNumber = logicalIndex + 1;
 
     // מציאת כל הקישורים לשורה זו והמרה ישירה ל-Set
@@ -2430,6 +2479,7 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
     _anchorLinksByLine = const {};
     _anchorBookNotes = BookNotes.empty;
     _anchorLoadedRanges = const [];
+    _notesColumnSource = null;
 
     try {
       // המתנה לכך שה-state יהיה TextBookLoaded
@@ -2464,6 +2514,10 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
         return;
       }
 
+      if (state is TextBookLoaded && _isNotesColumn) {
+        _showNotesColumn(state);
+        return;
+      }
       if (state is TextBookLoaded) {
         // סינון קישורים לפי שם המפרש ולפי סוג הקישור (COMMENTARY/TARGUM)
         _refreshRelevantLinks(state);
@@ -2653,10 +2707,9 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
     }
 
     // חישוב האינדקס הלוגי (עם טיפול בכותרות)
-    final logicalIndex = CommentarySyncHelper.getLogicalIndex(
-      currentMainIndex,
-      state.content,
-    );
+    final logicalIndex = _isNotesColumn
+        ? currentMainIndex
+        : CommentarySyncHelper.getLogicalIndex(currentMainIndex, state.content);
 
     // חישוב האינדקס היעד במפרש — היצמדות לקישור הקודם הקרוב ביותר
     final targetIndex = CommentarySyncHelper.getCommentaryTargetIndex(
@@ -2811,6 +2864,10 @@ class _CommentaryPaneState extends State<_CommentaryPane> {
                   ? null
                   : _anchorLinksByLine,
               anchorBookNotes: _anchorBookNotes,
+              isBookNotesColumn: _isNotesColumn,
+              sourceIndexForIndex: _isNotesColumn
+                  ? (index) => _relevantLinks[index].index1 - 1
+                  : null,
             );
           },
         );

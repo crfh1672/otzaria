@@ -911,8 +911,8 @@ export interface GematriaResult {
 export interface DictionaryLookupResult {
   term: string;
   acronyms: Array<{ acronym: string; meanings: string[] }>;
-  /** `hebrew` הוא טקסט עם סימון מקורי. */
-  aramaic: Array<{ aramaic: string; hebrew: string }>;
+  /** `hebrew` הוא טקסט עם סימון מקורי; `dictionary` הוא שם המילון (מ-0.9.99). */
+  aramaic: Array<{ aramaic: string; hebrew: string; dictionary: string }>;
 }
 
 export type JewishHolidayKind =
@@ -1567,6 +1567,10 @@ export interface ContextMenuItem {
   /** When true, clicking opens the plugin page and the click event is
    * delivered to it after boot. Available from 0.9.96. */
   openPlugin?: boolean;
+  /** With `openPlugin`: open another instance of the plugin in a new tab, next
+   * to the current one, and deliver the click event to it only. Requires
+   * `contributes.toolTab.allowMultipleInstances`. Available from 0.9.99. */
+  newTab?: boolean;
   /** Free-form value echoed back as `param` in the click event payload. */
   param?: unknown;
   /** Show the item only when the selected text matches. Available from 0.9.97. */
@@ -1644,6 +1648,10 @@ export interface ToolbarItem {
   /** When true, clicking opens the plugin page and the click event is
    * delivered to it after boot. */
   openPlugin?: boolean;
+  /** With `openPlugin`: open another instance of the plugin in a new tab, next
+   * to the current one, and deliver the click event to it only. Requires
+   * `contributes.toolTab.allowMultipleInstances`. Available from 0.9.99. */
+  newTab?: boolean;
   /** Free-form value echoed back as `param` in the click event payload. */
   param?: unknown;
 }

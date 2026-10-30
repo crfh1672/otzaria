@@ -93,16 +93,9 @@ class _SaferModePasswordDialogState extends State<SaferModePasswordDialog>
       onCancel: () => Navigator.of(context).pop(false),
       textFieldFocusNode: _textFieldFocusNode,
       child: AlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            const Icon(FluentIcons.lock_closed_24_regular),
-            const SizedBox(width: 8),
-            Text(
-              widget.title,
-              style: const TextStyle(fontSize: 20),
-            ),
-          ],
+        title: AppDialogTitle(
+          widget.title,
+          icon: FluentIcons.lock_closed_24_regular,
         ),
         content: SizedBox(
           width: 400,
@@ -128,7 +121,6 @@ class _SaferModePasswordDialogState extends State<SaferModePasswordDialog>
                 decoration: InputDecoration(
                   labelText: context.settingsText('סיסמה'),
                   hintText: context.settingsText('הזן את הסיסמה'),
-                  border: const OutlineInputBorder(),
                   prefixIcon: const Icon(FluentIcons.key_24_regular),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -299,16 +291,9 @@ class _SaferModeSetPasswordDialogState extends State<SaferModeSetPasswordDialog>
       onCancel: () => Navigator.of(context).pop(false),
       textFieldFocusNode: _passwordFocusNode,
       child: AlertDialog(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Text(
-              context.settingsText('הגדרת סיסמה'),
-              style: const TextStyle(fontSize: 20),
-            ),
-            const SizedBox(width: 8),
-            const Icon(FluentIcons.lock_closed_24_regular),
-          ],
+        title: AppDialogTitle(
+          context.settingsText('הגדרת סיסמה'),
+          icon: FluentIcons.lock_closed_24_regular,
         ),
         content: SizedBox(
           width: 400,
@@ -331,7 +316,6 @@ class _SaferModeSetPasswordDialogState extends State<SaferModeSetPasswordDialog>
                 decoration: InputDecoration(
                   labelText: context.settingsText('סיסמה חדשה'),
                   hintText: context.settingsText('לפחות 4 תווים'),
-                  border: const OutlineInputBorder(),
                   prefixIcon: const Icon(FluentIcons.key_24_regular),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -357,7 +341,6 @@ class _SaferModeSetPasswordDialogState extends State<SaferModeSetPasswordDialog>
                 decoration: InputDecoration(
                   labelText: context.settingsText('אימות סיסמה'),
                   hintText: context.settingsText('הזן שוב את הסיסמה'),
-                  border: const OutlineInputBorder(),
                   prefixIcon: const Icon(FluentIcons.checkmark_lock_24_regular),
                   suffixIcon: IconButton(
                     icon: Icon(

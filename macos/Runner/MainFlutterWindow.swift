@@ -10,6 +10,12 @@ final class OtzariaDartProject: FlutterDartProject {
   // דורס getter פנימי (FlutterDartProject_Internal.h); זו נקודת ההחלטה היחידה של המנוע.
   @objc var enableImpeller: Bool { OtzariaDartProject.useImpeller }
 
+  // המנוע מחפש את icudtl.dat ב-bundle של [self class], שב-subclass הוא Runner.app.
+  // בלי ICU אין הזדמנויות שבירה, והשורות נחתכות באמצע מילה (#3546).
+  @objc var ICUDataPath: String? {
+    Bundle(for: FlutterDartProject.self).path(forResource: "icudtl.dat", ofType: nil)
+  }
+
   static let useImpeller: Bool = {
     assert(
       class_getInstanceMethod(FlutterDartProject.self, NSSelectorFromString("enableImpeller"))
@@ -360,6 +366,8 @@ final class OtzariaWindowManager {
   private var channel: FlutterMethodChannel?
   /// Dart הסתיר את הראשי (`closeSelf`); הוא חוזר ב-`raiseSelf` או בשחזור.
   private var isMainHidden = false
+  /// סגירה ממתינה ליציאה ממסך מלא לפני ההסתרה.
+  private(set) var hidesAfterFullScreen = false
 
   private init() {}
 
@@ -377,6 +385,21 @@ final class OtzariaWindowManager {
       self.handleCall(call, result: result)
     }
     self.channel = channel
+    let center = NotificationCenter.default
+    _ = center.addObserver(
+      forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main
+    ) { [weak self] _ in
+      guard let self = self, self.hidesAfterFullScreen else { return }
+      self.hidesAfterFullScreen = false
+      self.hide()
+    }
+    // toggleFullScreen באמצע אנימציית הכניסה נבלע; מנסים שוב בסופה.
+    _ = center.addObserver(
+      forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main
+    ) { [weak self] _ in
+      guard let self = self, self.hidesAfterFullScreen else { return }
+      self.mainWindow?.toggleFullScreen(nil)
+    }
   }
 
   private func handleCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -388,12 +411,7 @@ final class OtzariaWindowManager {
       result(nil)
 
     case "raiseSelf":
-      if isMainHidden {
-        showMainWindow()
-      } else {
-        mainWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-      }
+      showMainWindow()
       result(nil)
 
     case "restoreLastClosedWindow":
@@ -408,6 +426,14 @@ final class OtzariaWindowManager {
 
   private func hide() {
     guard !isMainHidden, let window = mainWindow else { return }
+    // orderOut במסך מלא משאיר את ה-Space של החלון ריק (מסך שחור, #3551).
+    if window.styleMask.contains(.fullScreen) {
+      if !hidesAfterFullScreen {
+        hidesAfterFullScreen = true
+        window.toggleFullScreen(nil)
+      }
+      return
+    }
     isMainHidden = true
     // גם כשזה החלון האחרון: האפליקציה נשארת ב-Dock, ולחיצה עליו משחזרת.
     window.orderOut(nil)
@@ -417,6 +443,7 @@ final class OtzariaWindowManager {
   func showMainWindow() {
     guard let window = mainWindow else { return }
     isMainHidden = false
+    hidesAfterFullScreen = false
     window.alphaValue = 1
     window.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
@@ -424,7 +451,7 @@ final class OtzariaWindowManager {
 
   /// מציג שוב את הראשי ש-Dart הסתיר; false כשלא הוסתר.
   func restoreLastClosedWindow() -> Bool {
-    guard isMainHidden else { return false }
+    guard isMainHidden || hidesAfterFullScreen else { return false }
     showMainWindow()
     return true
   }

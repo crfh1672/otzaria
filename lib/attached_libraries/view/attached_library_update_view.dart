@@ -71,14 +71,12 @@ class AttachedUpdateSourceChip extends StatelessWidget {
 class AttachedLibraryUpdateRow extends StatelessWidget {
   const AttachedLibraryUpdateRow({
     super.key,
-    required this.library,
     required this.status,
     required this.onCheck,
     required this.onInstall,
     required this.onCancel,
   });
 
-  final AttachedLibrary library;
   final AttachedUpdateStatus status;
   final VoidCallback onCheck;
   final void Function(AttachedUpdateOffer offer) onInstall;
@@ -252,6 +250,8 @@ Future<bool> confirmAttachedUpdate(
           'עדכון המסד "{name}"',
           args: {'name': library.displayName},
         ),
+        icon: FluentIcons.arrow_sync_24_regular,
+        headerBand: true,
         content: '',
         customContent: _ConfirmContent(offer: offer),
         cancelText: dialogContext.settingsText('ביטול'),

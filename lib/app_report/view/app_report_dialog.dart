@@ -11,6 +11,7 @@ import 'package:otzaria/app_report/view/widgets/app_report_preview_section.dart'
 import 'package:otzaria/core/messages/report_messages.dart';
 import 'package:otzaria/core/ui_snack.dart';
 import 'package:otzaria/theme/theme_exports.dart';
+import 'package:otzaria/widgets/dialogs/app_dialog_header.dart';
 import 'package:otzaria/widgets/controls/action_buttons.dart';
 import 'package:otzaria/widgets/controls/segmented_control.dart';
 import 'package:otzaria/widgets/text/rtl_text_field.dart';
@@ -146,7 +147,6 @@ class _AppReportDialogState extends State<AppReportDialog> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeader(context, state),
-                  const Divider(height: 1),
                   Flexible(
                     child: switch (state) {
                       AppReportCollecting() => const Padding(
@@ -188,59 +188,11 @@ class _AppReportDialogState extends State<AppReportDialog> {
   /// כותרת הטופס: אייקון מסומל, שם הטופס ומשפט שמסביר מה עוזר בדיווח.
   /// הפס הצבוע מפריד אותה מהטופס עצמו, כמו בשאר הדיאלוגים המורכבים.
   Widget _buildHeader(BuildContext context, AppReportState state) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isSending = state is AppReportEditing && state.isSending;
-    return Container(
-      color: cs.surfaceContainerHighest,
-      padding: const EdgeInsetsDirectional.fromSTEB(
-        AppTokens.spaceLG,
-        AppTokens.spaceMD,
-        AppTokens.spaceSM,
-        AppTokens.spaceMD,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              FluentIcons.person_feedback_24_regular,
-              size: 22,
-              color: cs.onPrimaryContainer,
-            ),
-          ),
-          const SizedBox(width: AppTokens.spaceMD),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'דיווח על תקלה בתוכנה',
-                  style: theme.textTheme.titleLarge,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'ככל שהתיאור מדויק יותר, כך קל יותר לאתר את התקלה ולתקן אותה',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(FluentIcons.dismiss_24_regular),
-            tooltip: 'סגור',
-            onPressed: isSending ? null : () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
+    return AppDialogHeader(
+      icon: FluentIcons.person_feedback_24_regular,
+      title: 'דיווח על תקלה בתוכנה',
+      subtitle: 'ככל שהתיאור מדויק יותר, כך קל יותר לאתר את התקלה ולתקן אותה',
+      closeEnabled: !(state is AppReportEditing && state.isSending),
     );
   }
 
@@ -370,23 +322,20 @@ class _AppReportDialogState extends State<AppReportDialog> {
           FluentIcons.mail_24_regular,
           'דואר אלקטרוני לחזרה אליך',
         ),
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: RtlTextField(
-            key: const ValueKey('app-report-email'),
-            controller: _email,
-            enabled: enabled,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppSurfaces.card(context),
-              hintText: 'name@example.com',
-              errorText: state.invalidField == 'reporterEmail'
-                  ? 'נדרשת כתובת תקינה'
-                  : null,
-            ),
-            onChanged: (value) => bloc.add(AppReportEmailChanged(value)),
+        RtlTextField(
+          key: const ValueKey('app-report-email'),
+          controller: _email,
+          enabled: enabled,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppSurfaces.card(context),
+            hintText: 'name@example.com',
+            errorText: state.invalidField == 'reporterEmail'
+                ? 'נדרשת כתובת תקינה'
+                : null,
           ),
+          onChanged: (value) => bloc.add(AppReportEmailChanged(value)),
         ),
         const SizedBox(height: AppTokens.spaceMD),
         AppReportImagesSection(

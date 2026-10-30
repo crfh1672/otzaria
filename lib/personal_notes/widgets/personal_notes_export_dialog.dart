@@ -1,7 +1,11 @@
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:otzaria/personal_notes/models/personal_note.dart';
 import 'package:otzaria/personal_notes/utils/personal_notes_book_key.dart';
+import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
+import 'package:otzaria/theme/app_tokens.dart';
 import 'package:otzaria/utils/calendar_days.dart';
+import 'package:otzaria/widgets/dialogs/app_dialog_frame.dart';
 import 'package:otzaria/widgets/misc/app_menu_exports.dart';
 import 'package:otzaria/widgets/widgets_exports.dart';
 import 'package:otzaria/widgets/text/rtl_text_field.dart';
@@ -103,25 +107,34 @@ class _PersonalNotesExportDialogState extends State<PersonalNotesExportDialog> {
           (note.displayTitle?.toLowerCase().contains(query) ?? false);
     }).toList();
 
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SizedBox(
-        width: 540,
+    return AppDialogFrame(
+      title: widget.title,
+      icon: FluentIcons.arrow_upload_24_regular,
+      width: 540,
+      actions: [
+        ActionButton.neutral(
+          onPressed: () => Navigator.of(context).pop(),
+          text: 'ביטול',
+        ),
+        ActionButton.recommended(
+          onPressed: _submit,
+          text: widget.confirmText,
+        ),
+      ],
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: NotesExportMode.values.map((mode) {
-                return ChoiceChip(
-                  label: Text(_labelForMode(mode)),
-                  selected: _mode == mode,
-                  onSelected: (_) => setState(() => _mode = mode),
-                );
-              }).toList(),
+            AppSegmentedControl<NotesExportMode>(
+              options: [
+                for (final mode in NotesExportMode.values)
+                  SegmentOption(value: mode, label: _labelForMode(mode)),
+              ],
+              currentValue: _mode,
+              expandToFillWidth: true,
+              onChanged: (mode) => setState(() => _mode = mode),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppTokens.spaceMD),
             if (_mode == NotesExportMode.byBook)
               AppDropdownField<String>(
                 value: _selectedBookId,
@@ -136,7 +149,6 @@ class _PersonalNotesExportDialogState extends State<PersonalNotesExportDialog> {
                 onSelected: (value) => setState(() => _selectedBookId = value),
                 decoration: const InputDecoration(
                   labelText: 'בחר ספר',
-                  border: OutlineInputBorder(),
                 ),
               ),
             if (_mode == NotesExportMode.byDateRange)
@@ -164,53 +176,45 @@ class _PersonalNotesExportDialogState extends State<PersonalNotesExportDialog> {
                 controller: _searchController,
                 decoration: const InputDecoration(
                   labelText: 'חיפוש הערות',
-                  border: OutlineInputBorder(),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppTokens.spaceSM),
               SizedBox(
                 height: 240,
-                child: ListView.builder(
-                  itemCount: filteredNotes.length,
-                  itemBuilder: (context, index) {
-                    final note = filteredNotes[index];
-                    final selected = _manualSelection[note.id] ?? false;
-                    return CheckboxListTile(
-                      value: selected,
-                      title: Text(
-                        note.displayTitle?.isNotEmpty == true
-                            ? note.displayTitle!
-                            : note.bookId,
-                      ),
-                      subtitle: Text(
-                        note.contentPlain,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onChanged: (value) {
-                        setState(
-                          () => _manualSelection[note.id] = value ?? false,
-                        );
-                      },
-                    );
-                  },
+                child: ListDialogCard(
+                  child: ListView.builder(
+                    itemCount: filteredNotes.length,
+                    itemBuilder: (context, index) {
+                      final note = filteredNotes[index];
+                      final selected = _manualSelection[note.id] ?? false;
+                      return CheckboxListTile(
+                        shape: Border(bottom: listDialogRowDivider(context)),
+                        value: selected,
+                        title: Text(
+                          note.displayTitle?.isNotEmpty == true
+                              ? note.displayTitle!
+                              : note.bookId,
+                        ),
+                        subtitle: Text(
+                          note.contentPlain,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onChanged: (value) {
+                          setState(
+                            () => _manualSelection[note.id] = value ?? false,
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
           ],
         ),
       ),
-      actions: [
-        ActionButton.neutral(
-          onPressed: () => Navigator.of(context).pop(),
-          text: 'ביטול',
-        ),
-        ActionButton.recommended(
-          onPressed: _submit,
-          text: widget.confirmText,
-        ),
-      ],
     );
   }
 

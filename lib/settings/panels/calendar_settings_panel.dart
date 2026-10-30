@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:otzaria/settings/dialogs/list_dialog_frame.dart';
 import 'package:otzaria/utils/file/file_picker_dialog_options.dart';
+import 'package:otzaria/widgets/dialogs/app_dialog_frame.dart';
 import 'package:otzaria/widgets/text/rtl_text_field.dart';
 import 'package:otzaria_icons/otzaria_icons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,6 +18,7 @@ import 'package:otzaria/core/messages/settings_messages.dart';
 import 'package:otzaria/core/messages/tools_messages.dart';
 import 'package:otzaria/core/ui_snack.dart';
 import 'package:otzaria/settings/widgets/settings_widgets_exports.dart';
+import 'package:otzaria/widgets/feedback/tool_empty_state.dart';
 import 'package:otzaria/widgets/text/otzaria_search_field.dart';
 import 'package:otzaria/tools/calendar/models/calendar_location.dart';
 import 'package:otzaria/tools/calendar/bloc/calendar_cubit.dart';
@@ -76,6 +80,14 @@ class CalendarSettingsTab extends StatefulWidget {
       tab: SettingsTab.tools,
       cardId: 'tools.calendar',
       keywords: ['לוח שנה', 'מעבר יום', 'שקיעה', 'חצות', 'שעה'],
+    ),
+    SettingsSearchEntry(
+      id: 'tools.calendar.twelve_hour_clock',
+      title: 'שעון 12 שעות',
+      subtitle: 'הצגת הזמנים בפורמט AM/PM',
+      tab: SettingsTab.tools,
+      cardId: 'tools.calendar',
+      keywords: ['לוח שנה', 'זמנים', 'שעה', 'AM', 'PM', '24 שעות', 'פורמט'],
     ),
     SettingsSearchEntry(
       id: 'tools.calendar.candle_minutes',
@@ -251,6 +263,15 @@ class _CalendarSettingsTabState extends State<CalendarSettingsTab> {
                         value,
                       );
                     }
+                  },
+                ),
+                SettingsActionTile.switchTile(
+                  icon: FluentIcons.clock_24_regular,
+                  title: context.settingsText('שעון 12 שעות'),
+                  subtitle: context.settingsText('הצגת הזמנים בפורמט AM/PM'),
+                  value: state.twelveHourClock,
+                  onChanged: (value) {
+                    context.read<CalendarCubit>().changeTwelveHourClock(value);
                   },
                 ),
                 // עיר
@@ -680,9 +701,12 @@ class _IcsSubscriptionDialogState extends State<_IcsSubscriptionDialog> {
     final cs = Theme.of(context).colorScheme;
     return AlertDialog(
       backgroundColor: cs.surfaceContainerHigh,
-      title: Text(context.settingsText('הוספת יומן מקישור')),
+      title: AppDialogTitle(
+        context.settingsText('הוספת יומן מקישור'),
+        icon: FluentIcons.link_24_regular,
+      ),
       content: SizedBox(
-        width: 400,
+        width: math.min(400.0, MediaQuery.sizeOf(context).width - 112),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -693,7 +717,7 @@ class _IcsSubscriptionDialogState extends State<_IcsSubscriptionDialog> {
                 labelText: context.settingsText('שם היומן'),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppTokens.spaceMD),
             RtlTextField(
               controller: _urlController,
               decoration: InputDecoration(
@@ -705,13 +729,13 @@ class _IcsSubscriptionDialogState extends State<_IcsSubscriptionDialog> {
         ),
       ),
       actions: [
-        ActionButton.ghost(
+        ActionButton.neutral(
           text: context.settingsText('ביטול'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         ActionButton.recommended(
           text: context.settingsText('אישור'),
-          onPressed: _urlValid ? _submit : () {},
+          onPressed: _urlValid ? _submit : null,
         ),
       ],
     );
@@ -825,47 +849,61 @@ class _CalendarMultiSelectionDialogState<T>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return AlertDialog(
+    return AppDialogFrame(
       backgroundColor: cs.surfaceContainerHigh,
-      title: Text(widget.title),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 400,
-        child: Column(
-          children: [
-            OtzariaSearchField(
-              controller: _searchController,
-              hintText: widget.searchHint,
-              autofocus: true,
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: widget.items.isEmpty
-                  ? Center(
-                      child: Text(
+      title: widget.title,
+      icon: OtzariaIcons.calendar_24_regular,
+      width: 460,
+      height: 560,
+      actions: [
+        ActionButton.neutral(
+          text: context.settingsText('ביטול'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        ActionButton.recommended(
+          text: context.settingsText('אישור'),
+          onPressed: selectedValues.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(selectedValues.toList()),
+        ),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OtzariaSearchField(
+            controller: _searchController,
+            hintText: widget.searchHint,
+            autofocus: true,
+          ),
+          const SizedBox(height: AppTokens.spaceSM),
+          Expanded(
+            child: widget.items.isEmpty
+                ? ToolEmptyState(
+                    icon: OtzariaIcons.calendar_24_regular,
+                    message:
                         widget.emptyMessage ??
-                            context.settingsText('לא נמצאו פריטים'),
-                        style: TextStyle(color: cs.onSurfaceVariant),
-                      ),
-                    )
-                  : filteredItems.isEmpty
-                  ? Center(
-                      child: Text(context.settingsText('לא נמצאו תוצאות')),
-                    )
-                  : ListView.builder(
+                        context.settingsText('לא נמצאו פריטים'),
+                  )
+                : filteredItems.isEmpty
+                ? ToolEmptyState(
+                    icon: OtzariaIcons.search_not_found_24_regular,
+                    message: context.settingsText('לא נמצאו תוצאות'),
+                  )
+                : ListDialogCard(
+                    child: ListView.separated(
                       itemCount: filteredItems.length,
+                      separatorBuilder: (context, _) => Divider(
+                        height: 1,
+                        color: listDialogRowDivider(context).color,
+                      ),
                       itemBuilder: (context, index) {
                         final item = filteredItems[index];
                         final isSelected = selectedValues.contains(item.value);
 
                         return CheckboxListTile(
-                          title: Text(
-                            item.label,
-                          ),
+                          title: Text(item.label),
                           subtitle: item.subtitle != null
-                              ? Text(
-                                  item.subtitle!,
-                                )
+                              ? Text(item.subtitle!)
                               : null,
                           value: isSelected,
                           onChanged: (value) {
@@ -880,23 +918,10 @@ class _CalendarMultiSelectionDialogState<T>
                         );
                       },
                     ),
-            ),
-          ],
-        ),
+                  ),
+          ),
+        ],
       ),
-      actions: [
-        ActionButton.neutral(
-          text: context.settingsText('ביטול'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        ActionButton.recommended(
-          text: context.settingsText('אישור'),
-          onPressed: selectedValues.isEmpty
-              ? () {}
-              : () => Navigator.of(context).pop(selectedValues.toList()),
-          isLoading: false,
-        ),
-      ],
     );
   }
 }
