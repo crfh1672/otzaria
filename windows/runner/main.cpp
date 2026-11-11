@@ -432,6 +432,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   flutter::DartProject project(L"data");
+#if defined(_DEBUG)
+  // בחלק מסביבות Windows מסלול ה-Composition מציג תוספי WebView כדף לבן
+  // בבניית Debug. HWND הוא המסלול שנבדק ועובד; Release נשאר במסלול הרגיל.
+  // אפשר לבטל את הכפייה במפורש עם FLUTTER_INAPPWEBVIEW_WINDOWS_FORCE_HWND=0.
+  if (::GetEnvironmentVariableW(L"FLUTTER_INAPPWEBVIEW_WINDOWS_FORCE_HWND",
+                               nullptr, 0) == 0) {
+    ::SetEnvironmentVariableW(L"FLUTTER_INAPPWEBVIEW_WINDOWS_FORCE_HWND", L"1");
+  }
+#endif
   // ב-RDP שיתוף ה-D3D surface של ה-composition נכשל (מסך ריק בתוספים); כופים HWND.
   if (::GetSystemMetrics(SM_REMOTESESSION) &&
       ::GetEnvironmentVariableW(L"FLUTTER_INAPPWEBVIEW_WINDOWS_FORCE_HWND",
