@@ -39,6 +39,7 @@ import 'package:otzaria/core/focus_repository.dart';
 import 'package:otzaria/settings/settings_exports.dart' hide UpdateFontSize;
 import 'package:otzaria/tabs/models/text_tab.dart';
 import 'package:otzaria/text_book/companion/companion_books.dart';
+import 'package:otzaria/text_book/companion/tur_shulchan_aruch.dart';
 import 'package:otzaria/widgets/navigation/reader_nav_center.dart';
 import 'package:otzaria/tabs/models/commentators_tab.dart';
 import 'package:otzaria/tabs/bloc/tabs_bloc.dart';
@@ -185,9 +186,6 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
   // נפתח (false→true) ולא בכל rebuild - אחרת היה גונב פוקוס מתוכן הספר.
   bool _wasLeftPaneShown = false;
 
-  // חלונית שנפתחה לבד עם הספר לא לוקחת את הפוקוס לחיפוש בעץ: החיצים שייכים לקריאה.
-  bool _leftPaneSeenClosed = false;
-
   /// לשונית החיפוש נבחרה בפתיחת הספר (מתוצאת חיפוש) ולא בהקשה של המשתמש.
   bool _searchTabAutoSelected = false;
   FocusRepository? _focusRepository; // שמירת הפניה לשימוש ב-dispose
@@ -200,6 +198,7 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
   bool _hasResolvedCompanionPdf = false;
   // מהדורות מקבילות ללחצן המובנה: המובנית ראשונה, אחריה היברובוקס מקומיות.
   List<ParallelEdition> _parallelEditions = const [];
+  List<TextBook> _turShulchanAruchPairs = const [];
   bool _hasBookVersions = false;
   // מצב חלונית הצד שזוהה לאחרונה, לעיגון-מחדש של הטקסט בעת פתיחה/סגירה.
   bool _lastShowLeftPaneForReanchor = false;
@@ -576,20 +575,25 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
     _searchTabAutoSelected = false;
     _searchHost.activeTab = tabController.index;
     if (tabController.indexIsChanging) return;
-    _focusActiveTabSearchField(userAction: true);
+    _focusActiveTabSearchField();
   }
 
-  /// ממקד את שדה החיפוש של הלשונית הפעילה; ב'ניווט' וב'כותרות' גם פותח אותו.
-  /// לא עושה דבר כשהפאנל סגור.
-  void _focusActiveTabSearchField({bool userAction = false}) {
+  /// ממקד את שדה החיפוש של הלשונית הפעילה רק כשהחלונית פתוחה.
+  void _focusActiveTabSearchField() {
     // במסך צר מיקוד יזום פותח את מקלדת המערכת על ספר שרק רצו לקרוא.
-    if (!NavPanelSearch.isWide(context)) return;
+    if (!NavPanelSearch.isWide(context) ||
+        !TickerMode.valuesOf(context).enabled ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    final activePane = context.read<TabsBloc>().state.activePane;
+    if (activePane != null && !identical(activePane, widget.tab)) return;
     final state = context.read<TextBookBloc>().state;
     if (state is! TextBookLoaded || !state.showLeftPane) return;
     final index = tabController.index;
     if (index == (_hasAltTitles ? 2 : 1)) {
       textSearchFocusNode.requestFocus();
-    } else if (userAction || _leftPaneSeenClosed) {
+    } else {
       _searchHost.openCollapsibleSearch(index);
     }
   }
@@ -603,9 +607,11 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
     _hasResolvedCompanionPdf = true;
     try {
       final editions = await ParallelEditionsService.find(widget.tab.book);
+      final pairs = await findTurShulchanAruchPairs(widget.tab.book);
       if (!mounted) return;
       setState(() {
         _parallelEditions = editions;
+        _turShulchanAruchPairs = pairs;
         Book? companion;
         for (final edition in editions) {
           if (edition.isCompanion) {
@@ -1346,6 +1352,10 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
       // 1b) The companion book beside this one (Biur Halacha for Mishnah
       // Berurah). Hidden while this book shares its tab with another book.
       ?_buildCompanionBookAction(context, state),
+
+      // 1c) The Tur and the Shulchan Arukh open each other at the same siman.
+      if (_turShulchanAruchPairs.isNotEmpty)
+        _buildTurShulchanAruchAction(context, state),
 
       // 2) View Mode Dropdown (מאחד את Split View ו-Page Shape View)
       ActionButtonData(
@@ -2144,6 +2154,52 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
     await setShowCompanionBookByDefault(true);
   }
 
+  ActionButtonData _buildTurShulchanAruchAction(
+    BuildContext context,
+    TextBookLoaded state,
+  ) {
+    final label = state.book.title == 'טור' ? 'שולחן ערוך' : 'טור';
+    final tooltip = 'פתח את $label באותו סימן';
+    void open() => unawaited(_openTurShulchanAruchPair());
+    return ActionButtonData(
+      widget: BarButton.icon(
+        tooltip: tooltip,
+        icon: FluentIcons.book_open_24_regular,
+        label: label,
+        compact: AppDensity.of(context).isCompact,
+        onPressed: open,
+      ),
+      icon: FluentIcons.book_open_24_regular,
+      tooltip: tooltip,
+      // Neither book has a companion pane, so they share its slot.
+      actionId: ToolbarActionId.companionBook,
+      toolbarWidth: 132,
+      onPressed: open,
+    );
+  }
+
+  Future<void> _openTurShulchanAruchPair() async {
+    final target = await resolveTurShulchanAruchTarget(
+      widget.tab.book,
+      widget.tab.index,
+      _turShulchanAruchPairs,
+    );
+    if (!mounted) return;
+    if (target == null) {
+      UiSnack.show(TextBookMessages.pairedBookLocationNotFound);
+      return;
+    }
+    openBook(
+      context,
+      target.book,
+      target.index,
+      '',
+      ignoreHistory: true,
+      requiresStableLayout: true,
+      insertAdjacent: true,
+    );
+  }
+
   ActionButtonData _buildParallelEditionsAction(
     BuildContext context,
     TextBookLoaded state,
@@ -2372,16 +2428,12 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
   }
 
   Widget _buildLeftPaneContent(TextBookLoaded state) {
-    // ברגע שהפאנל הצדדי נפתח (false→true) מעבירים פוקוס לשדה החיפוש של
-    // הלשונית הפעילה. ההחלטה מבוצעת בפונקציה טהורה (resolveLeftPaneSearchFocus)
-    // שמבטיחה שלא נבקש פוקוס בכל rebuild - הגנה מפני רגרסיה לבאג הגלילה
-    // האינסופית (commit 41a5816fc).
+    // מיקוד רק בפתיחה: בנייה בעקבות גלילה אינה לוקחת פוקוס מתוכן הספר.
     final focusDecision = resolveLeftPaneSearchFocus(
       showLeftPane: state.showLeftPane,
       wasShown: _wasLeftPaneShown,
     );
     _wasLeftPaneShown = focusDecision.wasShownNext;
-    if (!state.showLeftPane) _leftPaneSeenClosed = true;
     if (focusDecision.shouldFocus) {
       // microtask: אזור הקריאה מבקש פוקוס ראשוני ב-post-frame של אותו פריים,
       // ובקשה שקודמת לו נדרסת.
@@ -2526,14 +2578,7 @@ class _TextBookViewerBlocState extends State<TextBookViewerBloc>
   }
 }
 
-/// מחליטה אם לבקש פוקוס לשדה החיפוש של הפאנל הצדדי, ומחזירה גם את המצב
-/// הבא של "הפאנל הוצג".
-///
-/// מבקשים פוקוס אך ורק במעבר של הפאנל מסגור לפתוח. בכל rebuild שבו הפאנל
-/// כבר פתוח (למשל בזמן גלילה, שבה ה-bloc פולט states חדשים שוב ושוב) —
-/// [shouldFocus] יהיה false. זו ההגנה מפני רגרסיה לבאג "הגלילה האינסופית"
-/// (commit 41a5816fc): קריאת requestFocus חוזרת בכל build חטפה פוקוס מתוכן
-/// הספר ויצרה לולאת גלילה עד סוף המסמך.
+/// מבקשת מיקוד רק במעבר מסגור לפתוח; בנייה בעקבות גלילה אינה ממקדת מחדש.
 ({bool shouldFocus, bool wasShownNext}) resolveLeftPaneSearchFocus({
   required bool showLeftPane,
   required bool wasShown,

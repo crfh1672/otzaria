@@ -700,8 +700,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: flutter_local_notifications_windows
-      ref: "327a0713ccebe2bdf981db532c5904e3b731ef16"
-      resolved-ref: "327a0713ccebe2bdf981db532c5904e3b731ef16"
+      ref: "0943fb8a6ee58b2aaabc578835d0019e54b3133e"
+      resolved-ref: "0943fb8a6ee58b2aaabc578835d0019e54b3133e"
       url: "https://github.com/Otzaria/flutter_local_notifications"
     source: git
     version: "4.0.0"
@@ -1011,10 +1011,18 @@ packages:
     dependency: transitive
     description:
       name: jni
-      sha256: d2c361082d554d4593c3012e26f6b188f902acd291330f13d6427641a92b3da1
+      sha256: "2e91e6087291affd10b31b6c872f3e3ac7dc5d93b51b5ba485d930c8f08bde6c"
       url: "https://pub.dev"
     source: hosted
-    version: "0.14.2"
+    version: "1.1.2"
+  jni_util:
+    dependency: transitive
+    description:
+      name: jni_util
+      sha256: "1ba86da04a5f2bf18fde2edb235587e70c5b0fc5bd4ba955f46b00942c3fc35f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   json_annotation:
     dependency: transitive
     description:
@@ -1189,11 +1197,11 @@ packages:
     dependency: "direct main"
     description:
       path: package
-      ref: "v1.005"
-      resolved-ref: b43b67bb706be6bc87af14658d67e16cd347fc29
+      ref: "v1.006"
+      resolved-ref: "3ecbac138743cf804e8c2eef509dc0b26ae719c8"
       url: "https://github.com/palmoni5/otzaria-ashurit.git"
     source: git
-    version: "1.0.5"
+    version: "1.0.6"
   otzaria_context_menu:
     dependency: "direct main"
     description:
@@ -1344,37 +1352,37 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/pdfium_dart"
-      ref: d898e52b1526532c8d66a5f7fee0ca6b867a77d0
-      resolved-ref: d898e52b1526532c8d66a5f7fee0ca6b867a77d0
+      ref: f8f29ee20d8cd895122fccba35439f888a9135e8
+      resolved-ref: f8f29ee20d8cd895122fccba35439f888a9135e8
       url: "https://github.com/Otzaria/pdfrx"
     source: git
-    version: "0.4.1"
+    version: "0.4.2"
   pdfium_flutter:
     dependency: transitive
     description:
       name: pdfium_flutter
-      sha256: "4d18e6181aa87200750aa4fc607c870f957731b1de9252c2ea19627c19109388"
+      sha256: "4b98ef6d86ada59ad99abd07cf90871929fa733677d6fbcac83a4f575e759ac3"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.1"
+    version: "0.4.2"
   pdfrx:
     dependency: "direct main"
     description:
       path: "packages/pdfrx"
-      ref: d898e52b1526532c8d66a5f7fee0ca6b867a77d0
-      resolved-ref: d898e52b1526532c8d66a5f7fee0ca6b867a77d0
+      ref: f8f29ee20d8cd895122fccba35439f888a9135e8
+      resolved-ref: f8f29ee20d8cd895122fccba35439f888a9135e8
       url: "https://github.com/Otzaria/pdfrx"
     source: git
-    version: "2.12.0"
+    version: "2.12.1"
   pdfrx_engine:
     dependency: "direct overridden"
     description:
       path: "packages/pdfrx_engine"
-      ref: d898e52b1526532c8d66a5f7fee0ca6b867a77d0
-      resolved-ref: d898e52b1526532c8d66a5f7fee0ca6b867a77d0
+      ref: f8f29ee20d8cd895122fccba35439f888a9135e8
+      resolved-ref: f8f29ee20d8cd895122fccba35439f888a9135e8
       url: "https://github.com/Otzaria/pdfrx"
     source: git
-    version: "0.9.1"
+    version: "0.9.2"
   petitparser:
     dependency: "direct overridden"
     description:
@@ -1639,10 +1647,10 @@ packages:
     dependency: transitive
     description:
       name: sentry
-      sha256: "40a247686af64e497df29ab0de1303a20ca55a2e3c7c7e39b989fac47dcadf84"
+      sha256: "6549d5e63700434b76a21d4ee6a273fb7e1735307409777d043621f50d7ff9e2"
       url: "https://pub.dev"
     source: hosted
-    version: "9.30.1"
+    version: "10.4.0"
   sentry_dart_plugin:
     dependency: "direct dev"
     description:
@@ -1655,11 +1663,11 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/flutter"
-      ref: "93e7398355e80557a342666f98b23cc9bb832848"
-      resolved-ref: "93e7398355e80557a342666f98b23cc9bb832848"
+      ref: c3a1edeb3a0a509720ea8561122eaecf46d21c36
+      resolved-ref: c3a1edeb3a0a509720ea8561122eaecf46d21c36
       url: "https://github.com/Otzaria/sentry-dart"
     source: git
-    version: "9.30.1"
+    version: "10.4.0"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -2109,8 +2117,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/window_manager"
-      ref: "88a433a7be43ed0213da12b561bf0d8d070c6d68"
-      resolved-ref: "88a433a7be43ed0213da12b561bf0d8d070c6d68"
+      ref: "181407ed09f1ec98dc6cd47086a4a34b8a38da5a"
+      resolved-ref: "181407ed09f1ec98dc6cd47086a4a34b8a38da5a"
       url: "https://github.com/Otzaria/window_manager"
     source: git
     version: "0.5.2"

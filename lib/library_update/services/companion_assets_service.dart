@@ -1,8 +1,12 @@
+import 'package:otzaria/core/download_http_client.dart';
+import 'package:otzaria/core/download_network_policy.dart';
+import 'package:otzaria/core/messages/common_messages.dart';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:otzaria/core/error_log_file.dart';
 import 'package:otzaria/data/constants/database_constants.dart';
 import 'package:otzaria/data/data_providers/file_system_data_provider.dart';
 import 'package:otzaria/data/data_providers/tantivy_data_provider.dart';
@@ -144,8 +148,15 @@ class CompanionAssetsService {
       if (await _ensureTalmud(onStatus, onDownloadProgress, cancelled)) {
         libraryChanged = true;
       }
-    } catch (e) {
+    } on PatchDownloadCancelled {
+      // ביטול של המשתמש אינו תקלה.
+    } catch (e, stackTrace) {
       debugPrint('[CompanionAssets] talmud update failed: $e');
+      ErrorLogFile.appendInBackground(
+        title: 'Talmud Bavli update failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
     if (cancelled()) return libraryChanged;
 
@@ -165,6 +176,13 @@ class CompanionAssetsService {
         // ensureLatest מדווח 1.0 גם כשהמילון כבר מעודכן — לא מציגים "מוריד".
         var announced = false;
         await downloader.ensureLatest(
+          checkCancelled: () {
+            if (cancelled()) throw const PatchDownloadCancelled();
+          },
+          onWaitingForWifi: () => onStatus?.call(
+            CommonMessages.waitingForWifi,
+            CompanionAssetPhase.downloading,
+          ),
           onProgress: (progress) {
             if (progress >= 1.0) return;
             if (!announced) {
@@ -189,7 +207,15 @@ class CompanionAssetsService {
       onStatus?.call('בודק נתוני ביוגרפיות', CompanionAssetPhase.checking);
       final biographies = _biographiesFactory();
       try {
-        await biographies.ensureLatest();
+        await biographies.ensureLatest(
+          checkCancelled: () {
+            if (cancelled()) throw const PatchDownloadCancelled();
+          },
+          onWaitingForWifi: () => onStatus?.call(
+            CommonMessages.waitingForWifi,
+            CompanionAssetPhase.downloading,
+          ),
+        );
       } finally {
         biographies.dispose();
       }
@@ -216,6 +242,7 @@ class CompanionAssetsService {
     String? expectedSha256,
     void Function(int received, int? total)? onProgress,
     bool Function()? isCancelled,
+    void Function()? onWaitingForWifi,
   }) async {
     final client = _clientFactory();
     try {
@@ -228,6 +255,7 @@ class CompanionAssetsService {
         expectedSha256,
         onProgress,
         isCancelled ?? () => false,
+        onWaitingForWifi: onWaitingForWifi,
       );
     } finally {
       client.close();
@@ -313,17 +341,21 @@ class CompanionAssetsService {
         'otzaria_${DatabaseConstants.talmudBavliArchiveFileName}',
       );
       // כשל/ביטול משאירים את הקובץ החלקי בכוונה — ההרצה הבאה תמשיך דרך Range.
-      // הזהות (תג+גודל+id+updated_at) קושרת את השריד לגרסה: העלאה-מחדש תחת אותו
-      // תג וגודל משנה את id/updated_at, כך ששריד ישן לא ייחשב עדכני.
+      // הזהות (תג+גודל+id+updated_at) קושרת את השריד להעלאה מסוימת של הנכס.
+      final source = await _oldestTalmudReleaseWithSameContent(client, release);
       await _downloadToFile(
         client,
-        release.assetUrl,
+        source.assetUrl,
         tempPath,
-        '${release.tag}|${release.size}|${release.id}|${release.updatedAt}',
-        release.size,
-        release.sha256,
+        '${source.tag}|${source.size}|${source.id}|${source.updatedAt}',
+        source.size,
+        source.sha256,
         onDownloadProgress,
         cancelled,
+        onWaitingForWifi: () => onStatus?.call(
+          CommonMessages.waitingForWifi,
+          CompanionAssetPhase.downloading,
+        ),
       );
       if (cancelled()) return false;
 
@@ -618,6 +650,41 @@ class CompanionAssetsService {
     throw TalmudAssetNotFoundException();
   }
 
+  /// ה-release הישן ביותר שנכס התלמוד בו זהה בתוכנו ל-[latest]. הנכס מועלה
+  /// מחדש בכל release, ולכל העלאה URL ו-ETag משלה — ההמשך דורש מקור יציב.
+  Future<TalmudRelease> _oldestTalmudReleaseWithSameContent(
+    http.Client client,
+    TalmudRelease latest,
+  ) async {
+    if (latest.sha256 == null) return latest;
+    var oldest = latest;
+    // כשל סריקה חייב לעצור לפני שינוי המקור, כדי לא לאבד הורדה חלקית.
+    for (var page = 1; page <= 3; page++) {
+      final list = await _getGithubJson(
+        client,
+        _talmudReleaseApiUrl.replaceFirst(
+          '/releases/latest',
+          '/releases?per_page=100&page=$page',
+        ),
+      );
+      if (list is! List) {
+        throw const FormatException('Invalid Talmud releases response');
+      }
+      if (list.isEmpty) return oldest;
+      for (final r in list) {
+        if (r is! Map<String, dynamic> || r['prerelease'] == true) continue;
+        final release = _talmudReleaseFrom(r);
+        if (release == null) continue;
+        if (release.sha256 != latest.sha256) return oldest;
+        oldest = release;
+      }
+      if (page == 3 && list.length >= 100) {
+        throw StateError('Talmud source lookup exceeds 300 releases');
+      }
+    }
+    return oldest;
+  }
+
   static Future<dynamic> _getGithubJson(http.Client client, String url) async {
     final response = await client
         .get(
@@ -666,25 +733,32 @@ class CompanionAssetsService {
     int expectedSize,
     String? expectedSha256,
     void Function(int received, int? total)? onProgress,
-    bool Function() cancelled,
-  ) async {
+    bool Function() cancelled, {
+    void Function()? onWaitingForWifi,
+  }) async {
     // מסיר sidecar מהפורמט המקומי הישן. PatchDownloader משתמש ב-.resume
     // ושומר בו גם ETag חזק, כך שכל המשך נשלח עם If-Range ונמנע frankenfile.
     await deleteDownloadSidecar(destPath);
     final downloader = PatchDownloader(
       decompress: (_) async => null,
-      httpClient: client,
+      httpClient: createDownloadClient(client),
       connectTimeout: _downloadConnectTimeout,
       stallTimeout: _downloadStallTimeout,
     );
-    await downloader.downloadToFile(
-      url: url,
-      destPath: destPath,
-      expectedSize: expectedSize > 0 ? expectedSize : null,
-      expectedSha256: expectedSha256,
-      resumeToken: identity,
-      onProgress: onProgress,
-      isCancelled: cancelled,
+    await DownloadNetworkPolicy.instance.runResumable(
+      () => downloader.downloadToFile(
+        url: url,
+        destPath: destPath,
+        expectedSize: expectedSize > 0 ? expectedSize : null,
+        expectedSha256: expectedSha256,
+        resumeToken: identity,
+        onProgress: onProgress,
+        isCancelled: cancelled,
+      ),
+      checkCancelled: () {
+        if (cancelled()) throw const PatchDownloadCancelled();
+      },
+      onWaiting: onWaitingForWifi,
     );
   }
 
@@ -697,6 +771,10 @@ class CompanionAssetsService {
     bool Function() cancelled,
   ) async {
     final repository = _catalogRepository();
+    void waitingForWifi() => onStatus?.call(
+      CommonMessages.waitingForWifi,
+      CompanionAssetPhase.downloading,
+    );
     void extractionProgress(double progress) {
       onStatus?.call('מחלץ את הקטלוגים', CompanionAssetPhase.extracting);
       onDownloadProgress?.call((progress * 10000).round(), 10000);
@@ -708,6 +786,7 @@ class CompanionAssetsService {
         isCancelled: cancelled,
         onDownloadProgress: onDownloadProgress,
         onExtractionProgress: extractionProgress,
+        onWaitingForWifi: waitingForWifi,
         onUpdateAvailable: () => onStatus?.call(
           'מוריד את הקטלוגים',
           CompanionAssetPhase.downloading,
@@ -721,6 +800,7 @@ class CompanionAssetsService {
       isCancelled: cancelled,
       onDownloadProgress: onDownloadProgress,
       onExtractionProgress: extractionProgress,
+      onWaitingForWifi: waitingForWifi,
     );
     _invalidateExternalBooksCache();
     return true;

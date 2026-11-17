@@ -121,6 +121,7 @@ import 'package:otzaria/workspaces/workspace.dart';
 import 'package:otzaria/plugins/database/plugin_database_service.dart';
 import 'package:otzaria/plugins/utils/reader_location_resolver.dart';
 import 'package:otzaria/plugins/utils/plugin_icon_resolver.dart';
+import 'package:otzaria/plugins/utils/plugin_executable_files.dart';
 import 'package:otzaria/plugins/models/plugin_context_menu_item.dart';
 import 'package:otzaria/plugins/models/plugin_toolbar_item.dart';
 import 'package:otzaria/plugins/models/plugin_when_condition.dart';
@@ -5778,6 +5779,7 @@ class PluginBridgeAdapter {
         args['suggestedName'] as String?,
         extension,
       );
+      rejectPluginExecutable(suggested);
       final saver = _dependencies.pickSaveLocation ?? _defaultPickSaveLocation;
       final chosen = await saver(
         suggestedName: suggested,
@@ -5895,6 +5897,7 @@ class PluginBridgeAdapter {
   /// התיעוד של `File.rename` אינו מבטיח אותה, ובפועל היא מתקיימת ב-POSIX
   /// באותו volume וב-Windows דרך החלפה. לכן אין להצהיר „אטומי” בלי הסתייגות.
   Future<void> _atomicWrite(File source, String targetPath) async {
+    rejectPluginExecutable(targetPath);
     final target = File(targetPath);
     final suffix = _randomSuffix();
     final staging = File(
@@ -6372,6 +6375,30 @@ class PluginBridgeAdapter {
           'error.unknown_method: Unknown action in shortcut: $action',
         );
     }
+  }
+
+  /// אורך מרבי של כותרת כרטיסיה שהתוסף מבקש ב-`plugin.openSelf`.
+  static const int _maxOpenSelfTitleLength = 60;
+
+  /// כותרת הכרטיסיה של `plugin.openSelf` עם `newTab`: מחרוזת בלי תווי בקרה,
+  /// מקוצצת ל-[_maxOpenSelfTitleLength]. כותרת ריקה כמוה כחסרה. בלי `newTab`
+  /// אין מופע חדש לתת לו שם, ולכן זו שגיאה במקום התעלמות שקטה.
+  String? _parseOpenSelfTitle(Object? raw, bool newTab) {
+    if (raw == null) return null;
+    if (raw is! String) {
+      throw Exception('error.invalid_params: title must be a string');
+    }
+    if (!newTab) {
+      throw Exception('error.invalid_params: title requires newTab: true');
+    }
+    final cleaned = raw
+        .replaceAll(RegExp(r'[\u0000-\u001F\u007F-\u009F]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleaned.isEmpty) return null;
+    final graphemes = cleaned.characters;
+    if (graphemes.length <= _maxOpenSelfTitleLength) return cleaned;
+    return graphemes.take(_maxOpenSelfTitleLength).toString().trimRight();
   }
 
   /// גם ילד בתפריט יכול לפתוח מופע, ולכן בודקים את כל עץ הפריטים.
@@ -8098,6 +8125,7 @@ class PluginBridgeAdapter {
         if (newTab != null && newTab is! bool) {
           throw Exception('error.invalid_params: newTab must be boolean');
         }
+        final tabTitle = _parseOpenSelfTitle(args['title'], newTab == true);
         if (newTab == true) {
           // מופע נוסף הוא WebView נוסף מעל אותו אחסון — רק תוסף שהצהיר
           // במניפסט שהוא יודע לחיות לצד עצמו.
@@ -8120,6 +8148,7 @@ class PluginBridgeAdapter {
                   payload: {'param': args['param']},
                   viewId: _windowDependencies.viewId,
                   windowKeys: _windowDependencies.windowKeys,
+                  title: tabTitle,
                 );
             return openedInstanceId != null;
           }

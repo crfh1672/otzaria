@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "crash_record.h"
 #include "flutter_window.h"
 #include "jump_list_manager.h"
 #include "shift_key_normalizer.h"
@@ -349,6 +350,8 @@ void InstallActivationGuard() {
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t* command_line, _In_ int show_command) {
+  crash_record::Install();
+
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
@@ -400,6 +403,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CloseHandle(mutex);
     return EXIT_SUCCESS;
   }
+
+  if (!is_cli_invocation) crash_record::BeginSession();
 
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
@@ -485,6 +490,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
+    // גלילה מעל חלון אוצריא היא אינטראקציה גם כשהוא לא קיבל פוקוס.
+    // ההודעה מיועדת לרוב ל-Flutter child, ולכן מטפלים בה לפני DispatchMessage.
+    if ((msg.message == WM_MOUSEWHEEL || msg.message == WM_MOUSEHWHEEL) &&
+        msg.hwnd != nullptr) {
+      const HWND root = ::GetAncestor(msg.hwnd, GA_ROOT);
+      wchar_t window_class[64] = {};
+      if (root && ::GetClassNameW(root, window_class, 64) &&
+          (::wcscmp(window_class, kFlutterWindowClassName) == 0 ||
+           ::wcscmp(window_class, kDartHostWindowClassName) == 0)) {
+        FLASHWINFO flash = {sizeof(FLASHWINFO), root, FLASHW_STOP, 0, 0};
+        ::FlashWindowEx(&flash);
+      }
+    }
     NormalizeFlutterKeyboardMessage(msg);
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);

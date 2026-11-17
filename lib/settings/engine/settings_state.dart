@@ -54,6 +54,9 @@ class SettingsState extends Equatable {
   final IndexUpdateMode indexUpdateMode;
   final IndexingResourceMode indexingResourceMode;
 
+  /// האם ספרי PDF נכנסים לאינדקס החיפוש.
+  final bool indexPdfBooks;
+
   /// ברירת מחדל להצגת הטקסט ברצף (מצב "קריאה רציפה"). חלה בפתיחת ספר על
   /// ספרים שתומכים בכך בלבד (תנ"ך ותלמוד); בשאר הספרים אין לה השפעה.
   final bool defaultContinuousReadingMode;
@@ -81,6 +84,7 @@ class SettingsState extends Equatable {
   final bool pdfBookViewByDefault;
   final String talmudBavliOpenFormat;
   final bool isOfflineMode;
+  final bool downloadsWifiOnly;
   final bool enableHtmlLinks;
   final bool personalNotesCollapsedByDefault;
   final bool protectedModeEnabled;
@@ -168,6 +172,7 @@ class SettingsState extends Equatable {
     TextDisplayPolicy? textDisplayPolicy,
     required this.indexUpdateMode,
     this.indexingResourceMode = IndexingResourceMode.automatic,
+    this.indexPdfBooks = true,
     this.defaultContinuousReadingMode = false,
     required this.defaultSidebarOpen,
     required this.defaultCommentaryOpen,
@@ -187,6 +192,7 @@ class SettingsState extends Equatable {
     required this.pdfBookViewByDefault,
     required this.talmudBavliOpenFormat,
     required this.isOfflineMode,
+    this.downloadsWifiOnly = false,
     required this.enableHtmlLinks,
     required this.personalNotesCollapsedByDefault,
     required this.protectedModeEnabled,
@@ -283,6 +289,7 @@ class SettingsState extends Equatable {
     HolyNameStyle? holyNameStyle,
     IndexUpdateMode? indexUpdateMode,
     IndexingResourceMode? indexingResourceMode,
+    bool? indexPdfBooks,
     bool? defaultRemoveNikud,
     bool? removeNikudFromTanach,
     bool? defaultRemovePunctuation,
@@ -305,6 +312,7 @@ class SettingsState extends Equatable {
     bool? pdfBookViewByDefault,
     String? talmudBavliOpenFormat,
     bool? isOfflineMode,
+    bool? downloadsWifiOnly,
     bool? enableHtmlLinks,
     bool? personalNotesCollapsedByDefault,
     bool? protectedModeEnabled,
@@ -375,6 +383,7 @@ class SettingsState extends Equatable {
       showExternalBooks: showExternalBooks ?? this.showExternalBooks,
       indexUpdateMode: indexUpdateMode ?? this.indexUpdateMode,
       indexingResourceMode: indexingResourceMode ?? this.indexingResourceMode,
+      indexPdfBooks: indexPdfBooks ?? this.indexPdfBooks,
       defaultContinuousReadingMode:
           defaultContinuousReadingMode ?? this.defaultContinuousReadingMode,
       defaultSidebarOpen: defaultSidebarOpen ?? this.defaultSidebarOpen,
@@ -399,6 +408,7 @@ class SettingsState extends Equatable {
       talmudBavliOpenFormat:
           talmudBavliOpenFormat ?? this.talmudBavliOpenFormat,
       isOfflineMode: isOfflineMode ?? this.isOfflineMode,
+      downloadsWifiOnly: downloadsWifiOnly ?? this.downloadsWifiOnly,
       enableHtmlLinks: enableHtmlLinks ?? this.enableHtmlLinks,
       personalNotesCollapsedByDefault:
           personalNotesCollapsedByDefault ??
@@ -480,6 +490,7 @@ class SettingsState extends Equatable {
     textDisplayPolicy,
     indexUpdateMode,
     indexingResourceMode,
+    indexPdfBooks,
     defaultContinuousReadingMode,
     defaultSidebarOpen,
     defaultCommentaryOpen,
@@ -499,6 +510,7 @@ class SettingsState extends Equatable {
     pdfBookViewByDefault,
     talmudBavliOpenFormat,
     isOfflineMode,
+    downloadsWifiOnly,
     enableHtmlLinks,
     personalNotesCollapsedByDefault,
     protectedModeEnabled,

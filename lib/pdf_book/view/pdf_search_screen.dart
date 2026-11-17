@@ -16,6 +16,7 @@ import 'package:otzaria/core/ui_snack.dart';
 import 'package:otzaria/data/constants/database_constants.dart';
 import 'package:otzaria/data/data_providers/tantivy_data_provider.dart';
 import 'package:otzaria/indexing/models/index_update_mode.dart';
+import 'package:otzaria/indexing/models/pdf_index_setting.dart';
 import 'package:otzaria/models/books.dart';
 import 'package:otzaria/pdf_book/bloc/pdf_book_bloc.dart';
 import 'package:otzaria/pdf_book/bloc/pdf_book_event.dart';
@@ -160,10 +161,12 @@ class PdfBookSearchView extends StatefulWidget {
     required bool indexInitialized,
     required Set<String> indexedFilePaths,
     bool excludedByIndexMode = false,
+    bool pdfIndexingOff = false,
   }) {
     if (indexedFilePath == null || indexedFilePath.isEmpty) return null;
     if (!indexInitialized) return null;
     if (indexedFilePaths.contains(indexedFilePath)) return null;
+    if (pdfIndexingOff) return PdfMessages.pdfBooksNotInSearchIndex;
     return excludedByIndexMode
         ? PdfMessages.personalBookNotInSearchIndex
         : PdfMessages.bookNotInSearchIndex;
@@ -383,6 +386,9 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
 
   String _lastPdfHighlightSource = '';
   int _searchGeneration = 0;
+  late final _engineSearch = InBookEngineSearchCancellation(
+    widget.searchRepository,
+  );
   int _navigationRequest = 0;
 
   /// הדור שעבורו כבר נבדק אם לספר יש טקסט — הסריקה מודיעה על כל עמוד,
@@ -577,6 +583,15 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
     try {
       if (searcher.getMatchesRangeForPage(pageNumber) == null &&
           searcher.isSearching) {
+        // הסריקה מתחילה מעמוד 1: מעבירים אותה לעמוד היעד כדי לא להמתין לכל מה שלפניו.
+        final pattern = searcher.pattern;
+        if (pattern != null) {
+          searcher.startTextSearch(
+            pattern,
+            goToFirstMatch: false,
+            startPageNumber: pageNumber,
+          );
+        }
         revealed = await revealPageIfPending?.call() ?? false;
         if (!isCurrent()) return null;
         if (searcher.getMatchesRangeForPage(pageNumber) == null &&
@@ -676,6 +691,7 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
     oldWidget.textSearcher.removeListener(_onTextSearcherMatchesChanged);
     widget.textSearcher.addListener(_onTextSearcherMatchesChanged);
     _searchGeneration++;
+    _engineSearch.cancel();
     _centerOnOpenTargetPage = null;
     _cancelPageScanWait();
     _lastPdfHighlightSource = '';
@@ -967,6 +983,7 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
     );
     widget.textSearcher.removeListener(_onTextSearcherMatchesChanged);
     _cancelPageScanWait();
+    _engineSearch.cancel();
     super.dispose();
   }
 
@@ -1023,6 +1040,7 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
     // כל שינוי בשאילתה/במצב החיפוש מבטל תוצאות אסינכרוניות ישנות. בלי מזהה
     // דור, חיפוש איטי קודם יכול להסתיים אחרי החדש ולדרוס תוצאות והדגשות.
     final generation = ++_searchGeneration;
+    _engineSearch.cancel();
     _cancelPageScanWait();
     _resultsTruncated = false;
     // הדגל שייך לדור הקודם: כל מסלול יוצא מכאן בסדר השאילתה, והנסיגה
@@ -1127,6 +1145,7 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
         bookPath: _bookPath!,
         limit: kInBookEngineFetchLimit,
         settings: _settings,
+        cancelRequestId: _engineSearch.next(),
       );
 
       final indexedFilePath = _indexedFilePath;
@@ -1159,6 +1178,7 @@ class PdfBookSearchViewState extends State<PdfBookSearchView>
             excludedByIndexMode:
                 widget.source.isUser &&
                 !IndexUpdateMode.readStored().indexesPersonalBooks,
+            pdfIndexingOff: !readIndexPdfBooksSetting(),
           );
         }
       });

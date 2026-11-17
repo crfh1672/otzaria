@@ -735,6 +735,7 @@ class MainWindowScreenState extends State<MainWindowScreen>
     PluginPageLauncher.instance.registerInstanceOpener(
       _windowKeys,
       _openPluginInstance,
+      titledOpener: _openPluginInstance,
       hasOpenTab: _hasOpenPluginTab,
       hasOpenInstance: (key) =>
           mounted &&
@@ -2048,10 +2049,11 @@ class MainWindowScreenState extends State<MainWindowScreen>
     openToolTabById(context, pluginId);
   }
 
-  /// מופע נוסף של התוסף בכרטיסיה חדשה (`plugin.openSelf` עם `newTab`).
-  String? _openPluginInstance(String pluginId) {
+  /// מופע נוסף של התוסף בכרטיסיה חדשה (`plugin.openSelf` עם `newTab`),
+  /// עם [title] אופציונלי ככותרת הכרטיסיה.
+  String? _openPluginInstance(String pluginId, [String? title]) {
     if (!mounted) return null;
-    return openPluginToolInstanceById(context, pluginId);
+    return openPluginToolInstanceById(context, pluginId, title: title);
   }
 
   bool _hasOpenPluginTab(String pluginId) =>
@@ -3122,7 +3124,10 @@ class MainWindowScreenState extends State<MainWindowScreen>
                   (w) => w.id == currentId,
                 );
                 context.read<HistoryBloc>().add(
-                  SetCurrentWorkspaceName(workspace.name),
+                  SetCurrentWorkspaceName(
+                    workspace.name,
+                    workspaceId: workspace.id,
+                  ),
                 );
               }
             },
@@ -3541,6 +3546,24 @@ class MainWindowScreenState extends State<MainWindowScreen>
                   library,
                   previous: previous,
                   current: state.indexUpdateMode,
+                )) {
+                  indexingBloc.add(event);
+                }
+              });
+            },
+          ),
+          BlocListener<SettingsBloc, SettingsState>(
+            listenWhen: (previous, current) =>
+                previous.indexPdfBooks != current.indexPdfBooks,
+            listener: (context, state) {
+              if (!_duties.isProcessOwner) return;
+              DataRepository.instance.library.then((library) {
+                if (!mounted || !context.mounted) return;
+                final indexingBloc = context.read<IndexingBloc>();
+                for (final event in indexPdfBooksChangePlan(
+                  library,
+                  indexPdfBooks: state.indexPdfBooks,
+                  mode: state.indexUpdateMode,
                 )) {
                   indexingBloc.add(event);
                 }

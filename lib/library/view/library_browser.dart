@@ -524,9 +524,13 @@ class _LibraryBrowserState extends State<LibraryBrowser>
         BlocListener<CustomFoldersBloc, CustomFoldersState>(
           listenWhen: (p, c) => p.isSyncing && !c.isSyncing,
           listener: (_, state) {
-            // רק "טעינה מחדש" מסמן; סריקה שנכשלה לא שולחת RefreshLibrary.
+            final isManualReload = _reloadScanPending.value;
+            if (isManualReload && state.error != null) {
+              UiSnack.showError(state.error!);
+            }
+            // רק סריקה מוצלחת מדווחת אחר כך על קובצי היברובוקס לא מזוהים.
             _reportHebrewBooksAfterReload =
-                _reloadScanPending.value && state.error == null;
+                isManualReload && state.error == null;
             _reloadScanPending.value = false;
           },
         ),
@@ -1323,13 +1327,15 @@ class _LibraryBrowserState extends State<LibraryBrowser>
       ),
       if (settingsState.canUseSoftwareAndBookUpdates && !isLibraryEmpty)
         _buildSyncActionButton(compact: compact),
-      ActionButtonData.simple(
-        compact: compact,
-        tooltip: context.settingsText('טעינה מחדש'),
-        icon: FluentIcons.arrow_clockwise_24_regular,
-        actionId: ToolbarActionId.refresh,
-        onPressed: isLibraryEmpty ? null : _refreshWithPersonalFolders,
-      ),
+      // לתיקיית היברובוקס אין פעולת רענון חלופית בהגדרות.
+      if (settingsState.hebrewBooksPath.isNotEmpty)
+        ActionButtonData.simple(
+          compact: compact,
+          tooltip: context.settingsText('טעינה מחדש'),
+          icon: FluentIcons.arrow_clockwise_24_regular,
+          actionId: ToolbarActionId.refresh,
+          onPressed: isLibraryEmpty ? null : _refreshWithPersonalFolders,
+        ),
     ];
   }
 
@@ -1373,13 +1379,14 @@ class _LibraryBrowserState extends State<LibraryBrowser>
             ? null
             : () => _handleNavigateHome(context, state, settingsState),
       ),
-      ActionButtonData.simple(
-        compact: compact,
-        tooltip: context.settingsText('טעינה מחדש'),
-        icon: FluentIcons.arrow_clockwise_24_regular,
-        actionId: ToolbarActionId.refresh,
-        onPressed: isLibraryEmpty ? null : _refreshWithPersonalFolders,
-      ),
+      if (settingsState.hebrewBooksPath.isNotEmpty)
+        ActionButtonData.simple(
+          compact: compact,
+          tooltip: context.settingsText('טעינה מחדש'),
+          icon: FluentIcons.arrow_clockwise_24_regular,
+          actionId: ToolbarActionId.refresh,
+          onPressed: isLibraryEmpty ? null : _refreshWithPersonalFolders,
+        ),
     ];
   }
 

@@ -22,6 +22,7 @@ import 'package:otzaria/plugins/models/plugin_manifest.dart';
 import 'package:otzaria/plugins/repository/plugin_registry_repository.dart';
 import 'package:otzaria/plugins/services/webview2_creation_diagnostics.dart';
 import 'package:otzaria/plugins/storage/plugin_system_database.dart';
+import 'package:otzaria/search/active_lexical_searches.dart';
 import 'package:otzaria/search/models/search_configuration.dart';
 import 'package:otzaria/settings/engine/settings_repository.dart';
 import 'package:otzaria/theme/app_fonts.dart';
@@ -72,6 +73,28 @@ void main() {
     expect(diagnostics['context'], {'screen': 'reading', 'tabs': 3});
     expect(diagnostics['startupTimeline'], contains('lines'));
     expect(() => jsonEncode(diagnostics), returnsNormally);
+  });
+
+  test('אבחון: החיפושים המילוליים הפעילים נכללים', () async {
+    final previous = ActiveLexicalSearches.instance;
+    final searches = ActiveLexicalSearches.instance = ActiveLexicalSearches();
+    addTearDown(() => ActiveLexicalSearches.instance = previous);
+    final search = searches.start({'words': 4, 'prefixes': true});
+    addTearDown(() => search.finish('cancelled'));
+
+    final diagnostics = await AppReportCollector(
+      redactor: redactor,
+      clock: () => now,
+    ).collectDiagnostics();
+    final collected = diagnostics['searches'] as Map;
+    expect(collected['activeCount'], 1);
+    expect(
+      (collected['lexical'] as List).single,
+      containsPair('query', {
+        'words': 4,
+        'prefixes': true,
+      }),
+    );
   });
 
   test('אבחון: תוצאת חימום WebView2 נכללת במצב', () async {
@@ -290,6 +313,7 @@ void main() {
       expect(diagnostics['context'], {
         'screen': 'reading',
         'tabs': 1,
+        'currentTabIndex': 0,
         'tabsByType': {'ToolTab': 1},
         'currentTab': 'ToolTab',
         'currentTitle': r'%USERPROFILE%\Demo',
@@ -333,10 +357,47 @@ void main() {
         redactor: redactor,
         appInfoLoader: () async => {},
         includeCurrentContext: false,
+        previousRunContext: () async => null,
         clock: () => now,
       ).collectDiagnostics();
       expect(diagnostics.containsKey('context'), isFalse);
       expect(diagnostics.containsKey('inputFocus'), isFalse);
+      expect(diagnostics.containsKey('searches'), isFalse);
+      expect(diagnostics.containsKey('previousRun'), isFalse);
+    });
+
+    test('קריסה מהפעלה קודמת: ההקשר שהיא שמרה', () async {
+      final saved = {
+        'savedAt': '2026-09-17T09:59:58.000Z',
+        'pid': 4242,
+        'context': {'screen': 'search', 'currentTab': 'SearchingTab'},
+        'searches': {'activeCount': 1, 'lexical': <Object?>[]},
+      };
+      final diagnostics = await AppReportCollector(
+        redactor: redactor,
+        appInfoLoader: () async => {},
+        includeCurrentContext: false,
+        previousRunContext: () async => saved,
+        clock: () => now,
+      ).collectDiagnostics();
+      expect(diagnostics['previousRun'], saved);
+      expect(diagnostics.containsKey('context'), isFalse);
+    });
+
+    test('דוח על ההפעלה הנוכחית: בלי ההקשר של הקודמת', () async {
+      var asked = false;
+      final diagnostics = await AppReportCollector(
+        redactor: redactor,
+        appInfoLoader: () async => {},
+        currentContext: () => {'screen': 'reading'},
+        previousRunContext: () async {
+          asked = true;
+          return {'pid': 1};
+        },
+        clock: () => now,
+      ).collectDiagnostics();
+      expect(diagnostics.containsKey('previousRun'), isFalse);
+      expect(asked, isFalse);
     });
 
     test('כרטיסיית חיפוש: השאילתה לא נכנסת לכותרת', () {

@@ -46,11 +46,16 @@ class _GroupedResultItem {
   final String? header;
   final TextSearchResult? result;
   final int? resultListIndex;
+  final int? lastResultListIndex;
   const _GroupedResultItem.header(this.header)
     : result = null,
-      resultListIndex = null;
-  const _GroupedResultItem.result(this.result, this.resultListIndex)
-    : header = null;
+      resultListIndex = null,
+      lastResultListIndex = null;
+  const _GroupedResultItem.result(
+    this.result,
+    this.resultListIndex,
+    this.lastResultListIndex,
+  ) : header = null;
   bool get isHeader => header != null;
 }
 
@@ -142,6 +147,9 @@ class TextBookSearchViewState extends State<TextBookSearchView>
   int? _selectedResultLine;
   int? _selectedResultOffset;
   int _activeSearchRequestId = 0;
+  late final _engineSearch = InBookEngineSearchCancellation(
+    widget.searchRepository,
+  );
   final ItemScrollController _resultsScrollController = ItemScrollController();
   final ItemPositionsListener _resultsPositionsListener =
       ItemPositionsListener.create();
@@ -445,6 +453,7 @@ class TextBookSearchViewState extends State<TextBookSearchView>
 
   Future<void> _searchTextUpdated() async {
     final requestId = ++_activeSearchRequestId;
+    _engineSearch.cancel();
     final searchable = _searchableQuery(searchTextController.text);
     if (searchable == null) {
       setState(() {
@@ -553,6 +562,7 @@ class TextBookSearchViewState extends State<TextBookSearchView>
         bookPath: _bookPath!,
         limit: kInBookEngineFetchLimit,
         settings: _settings,
+        cancelRequestId: _engineSearch.next(),
       );
 
       final expectedTitle = _bookTitle!.trim();
@@ -706,12 +716,40 @@ class TextBookSearchViewState extends State<TextBookSearchView>
     }
   }
 
+  /// המונה סופר הופעות; כשחלקן חולקות קטע מצוין גם מספר המקומות שברשימה.
+  String _resultCountText({required int rows}) {
+    final total = searchResults.length;
+    if (rows == total) {
+      return _resultsTruncated
+          ? 'מוצגות $total התוצאות הראשונות'
+          : 'נמצאו $total תוצאות';
+    }
+    final inRows = rows == 1 ? 'במקום אחד' : 'ב־$rows מקומות';
+    return _resultsTruncated
+        ? 'מוצגות $total ההופעות הראשונות $inRows'
+        : 'נמצאו $total הופעות $inRows';
+  }
+
+  /// הופעות שחולקות קטע מוצגות בשורה אחת (issue #3083), אך נשארות תוצאות
+  /// נפרדות לניווט, למונה ולהדגשה.
+  bool _sharesPreviousRow(int i) =>
+      i > 0 && searchResults[i].sharesSnippetWith(searchResults[i - 1]);
+
+  int _rowStartOf(int i) {
+    while (_sharesPreviousRow(i)) {
+      i--;
+    }
+    return i;
+  }
+
   /// מחזיר את האינדקס הוויזואלי (בתוך הרשימה המקובצת) של תוצאה.
   /// אם התוצאה פותחת קטע חדש, מחזיר את אינדקס הכותרת (כדי שתהיה גלויה).
   int _visualIndexForResultListIndex(int target) {
+    target = _rowStartOf(target);
     int idx = 0;
     String? lastAddress;
     for (var i = 0; i < searchResults.length; i++) {
+      if (_sharesPreviousRow(i)) continue;
       final r = searchResults[i];
       final isNewSection = r.address != lastAddress;
       if (isNewSection) {
@@ -728,9 +766,11 @@ class TextBookSearchViewState extends State<TextBookSearchView>
   /// מחזיר את האינדקס הוויזואלי של שורת התוצאה עצמה (בלי הכותרת שלפניה).
   /// משמש לבדיקת נראות בניווט בחצים — נראות הכותרת אינה מבטיחה שהשורה גלויה.
   int _visualIndexForResultRow(int target) {
+    target = _rowStartOf(target);
     int idx = 0;
     String? lastAddress;
     for (var i = 0; i < searchResults.length; i++) {
+      if (_sharesPreviousRow(i)) continue;
       final r = searchResults[i];
       if (r.address != lastAddress) {
         lastAddress = r.address;
@@ -962,6 +1002,7 @@ class TextBookSearchViewState extends State<TextBookSearchView>
 
   @override
   void dispose() {
+    _engineSearch.cancel();
     searchTextController.dispose();
     _selectedResult.dispose();
     super.dispose();
@@ -988,11 +1029,24 @@ class TextBookSearchViewState extends State<TextBookSearchView>
       resultListIndex++
     ) {
       final r = searchResults[resultListIndex];
+      if (_sharesPreviousRow(resultListIndex)) {
+        final row = items.removeLast();
+        items.add(
+          _GroupedResultItem.result(
+            row.result,
+            row.resultListIndex,
+            resultListIndex,
+          ),
+        );
+        continue;
+      }
       if (lastAddress != r.address) {
         items.add(_GroupedResultItem.header(r.address));
         lastAddress = r.address;
       }
-      items.add(_GroupedResultItem.result(r, resultListIndex));
+      items.add(
+        _GroupedResultItem.result(r, resultListIndex, resultListIndex),
+      );
     }
 
     return SearchPaneBase(
@@ -1008,9 +1062,9 @@ class TextBookSearchViewState extends State<TextBookSearchView>
           ? _buildSearchResultNavigationBar()
           : null,
       resultCountString: searchResults.isNotEmpty
-          ? (_resultsTruncated
-                    ? 'מוצגות ${searchResults.length} התוצאות הראשונות'
-                    : 'נמצאו ${searchResults.length} תוצאות') +
+          ? _resultCountText(
+                  rows: items.where((item) => !item.isHeader).length,
+                ) +
                 (_activeSection != null ? ' בקטע הנוכחי' : '')
           : null,
       // כשתבנית ההדגשה מבוססת-האינדקס מגיעה (אסינכרונית), ה-snippets מחושבים
@@ -1044,6 +1098,7 @@ class TextBookSearchViewState extends State<TextBookSearchView>
               // אם זו תוצאה רגילה
               final result = item.result!;
               final resultListIndex = item.resultListIndex!;
+              final lastResultListIndex = item.lastResultListIndex!;
               return BlocBuilder<SettingsBloc, SettingsState>(
                 builder: (context, settingsState) {
                   final snippet = withHolyNamesSetting(
@@ -1114,7 +1169,10 @@ class TextBookSearchViewState extends State<TextBookSearchView>
                     child: ValueListenableBuilder<int?>(
                       valueListenable: _selectedResult,
                       builder: (context, selected, child) => NavTreeContentRow(
-                        isSelected: selected == resultListIndex,
+                        isSelected:
+                            selected != null &&
+                            selected >= resultListIndex &&
+                            selected <= lastResultListIndex,
                         onTap: () => _navigateToSearchResult(
                           resultListIndex,
                           closePane: true,

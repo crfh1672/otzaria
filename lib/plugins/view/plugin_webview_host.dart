@@ -199,6 +199,9 @@ mixin PluginWebViewHost<T extends StatefulWidget> on State<T> {
   _initialWindowDependencies;
   final _confirmationDialog = PluginConfirmationDialog();
   DateTime? _lastFileServerDenialLogAt;
+
+  /// הסיבה לכשל האחרון ברישום ה-WebView מול הגשר, להצגה במסך השגיאה.
+  String? lastAttachError;
   Future<PluginNetworkPolicy>? _networkPolicy;
   StreamSubscription<String?>? _networkPolicyChanges;
   List<ContentBlocker>? _contentBlockers;
@@ -591,6 +594,14 @@ mixin PluginWebViewHost<T extends StatefulWidget> on State<T> {
         instanceId: instanceId,
       );
       debugPrint('$logTag [${plugin.pluginId}] WebView init error: $e');
+      lastAttachError = 'WebView init failed: $e';
+      unawaited(
+        PluginSystemDatabase.instance.writeLog(
+          plugin.pluginId,
+          'ERROR',
+          lastAttachError!,
+        ),
+      );
       return false;
     }
   }
@@ -762,7 +773,7 @@ mixin PluginWebViewHost<T extends StatefulWidget> on State<T> {
   );
 
   /// סקריפט ה-boot: ה-SDK האמיתי וה-payload שהתוסף מקבל ב-plugin.boot.
-  String pluginBootScript({
+  Future<String> pluginBootScript({
     required String runMode,
     required PackageInfo packageInfo,
     required List<String> permissions,
@@ -770,7 +781,7 @@ mixin PluginWebViewHost<T extends StatefulWidget> on State<T> {
     Map<String, dynamic>? reader,
     Map<String, dynamic>? restore,
     String? fontFaceJson,
-  }) {
+  }) async {
     final bootPayload = {
       'plugin': {'id': plugin.pluginId, 'version': plugin.version},
       'app': {
@@ -794,9 +805,17 @@ mixin PluginWebViewHost<T extends StatefulWidget> on State<T> {
       'reader': ?reader,
       'restore': ?restore,
     };
-    return buildPluginBootScript(
-      nonceJson: jsonEncode(bridge.bridgeNonce),
-      payloadJson: jsonEncode(bootPayload),
+    final nonceJson = jsonEncode(bridge.bridgeNonce);
+    final payloadJson = jsonEncode(bootPayload);
+    if (fontFaceJson == null) {
+      return buildPluginBootScript(
+        nonceJson: nonceJson,
+        payloadJson: payloadJson,
+      );
+    }
+    return buildPluginBootScriptWithFonts(
+      nonceJson: nonceJson,
+      payloadJson: payloadJson,
       fontFaceJson: fontFaceJson,
     );
   }

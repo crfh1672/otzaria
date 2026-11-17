@@ -859,6 +859,30 @@ Future<void> main() async {
     expect(find.text('אין תוצאות'), findsNothing);
   }, skip: !engineReady);
 
+  testWidgets('חיפוש חדש וסגירת החלונית עוצרים במנוע את החיפוש הקודם', (
+    tester,
+  ) async {
+    final repository = _HangingSearchRepository();
+    final harness = await pumpSearchView(
+      tester,
+      searchRepository: repository,
+      initialQuery: 'תדע זרעך',
+      searchDistance: 2,
+    );
+    await harness.settle();
+    expect(repository.cancelIds, hasLength(1));
+    final first = repository.cancelIds.single;
+    expect(first, isNotNull);
+
+    await tester.enterText(find.byType(TextField).first, 'תדע זרעך כי');
+    await harness.settle();
+    expect(repository.cancelIds, hasLength(2));
+    expect(repository.cancelled, [first]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(repository.cancelled, [first, repository.cancelIds.last]);
+  });
+
   testWidgets('טווח "באותה פסקה" והתאמה חלקית עוברים אל בקשת המנוע', (
     tester,
   ) async {
@@ -1192,7 +1216,8 @@ Future<void> main() async {
 
     expect(simpleRunnerCalls, 0);
     expect(repository.requests, isEmpty);
-    expect(find.text('נמצאו 2 תוצאות'), findsOneWidget);
+    // שתי ההופעות באותו קטע מוצגות בשורה אחת (issue #3083).
+    expect(find.text('נמצאו 2 הופעות במקום אחד'), findsOneWidget);
   }, skip: !engineReady);
 }
 
@@ -1398,4 +1423,21 @@ class _TestSettingsBloc extends Bloc<SettingsEvent, SettingsState>
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// מאגר שחיפושיו אינם מסתיימים, ורושם את מזהי הביטול שנשלחו ושבוטלו.
+class _HangingSearchRepository extends SearchRepository {
+  final List<int?> cancelIds = [];
+  final List<int> cancelled = [];
+
+  @override
+  Future<List<SearchResult>> searchTexts(SearchEngineRequest request) {
+    cancelIds.add(request.cancelRequestId);
+    return Completer<List<SearchResult>>().future;
+  }
+
+  @override
+  Future<void> cancelLexicalSearch(int requestId) async {
+    cancelled.add(requestId);
+  }
 }

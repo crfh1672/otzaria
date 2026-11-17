@@ -429,10 +429,137 @@ void main() {
         repository: repo,
       );
 
-      expect(merged.single.children!, hasLength(1));
-      expect(merged.single.children!.single.label, contains('ארץ'));
-      expect(merged.single.children!.single.label, contains('אֲדָמָה'));
-      expect(other.single.children!.single.label, contains('איש'));
+      // ערך אחד לכל מפתח; אחריו מפריד ופעולת "פתח במילון".
+      expect(merged.single.children!, hasLength(3));
+      expect(merged.single.children!.first.label, contains('ארץ'));
+      expect(merged.single.children!.first.label, contains('אֲדָמָה'));
+      expect(other.single.children!.first.label, contains('איש'));
+    });
+
+    testWidgets(
+      'התפריט: התאמה מדויקת, מפריד, צירופים קצרים קודם ופעולת פתיחה בכלי',
+      (tester) async {
+        final repo = DictionaryLookupRepository(
+          loadAramaicEntries: () async => const <AramaicDictionaryEntry>[
+            AramaicDictionaryEntry(aramaic: 'א ב ג ליה', hebrew: 'ארוך'),
+            AramaicDictionaryEntry(aramaic: 'בעי ליה', hebrew: 'צריך לו'),
+            AramaicDictionaryEntry(aramaic: 'ליה', hebrew: 'לו'),
+          ],
+        );
+        await repo.ensureAramaicLoaded();
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+        );
+        final context = tester.element(find.byType(SizedBox));
+        final opened = <String>[];
+
+        final entries = buildDictionaryContextMenuEntries(
+          context: context,
+          selectedText: ' ליה ',
+          repository: repo,
+          openInDictionaryTool: (_, text) => opened.add(text),
+        );
+        final children = entries.single.children!;
+
+        expect(children.map((e) => e.isDivider), [
+          false, // ליה
+          true,
+          false, // בעי ליה
+          false, // א ב ג ליה
+          true,
+          false, // פתח במילון
+        ]);
+        expect(children[0].label, startsWith('ליה - '));
+        expect(children[2].label, startsWith('בעי ליה - '));
+        expect(children[3].label, startsWith('א ב ג ליה - '));
+        expect(children.last.label, 'פתח במילון הארמי-עברי');
+
+        children.last.onTap!();
+        expect(opened, ['ליה']);
+      },
+    );
+
+    testWidgets('התפריט: בלי התאמה מדויקת אין מפריד ראשון, ועם חיתוך מוצג המספר', (
+      tester,
+    ) async {
+      final repo = DictionaryLookupRepository(
+        loadAramaicEntries: () async => [
+          for (var i = 0; i < 12; i++)
+            AramaicDictionaryEntry(aramaic: 'מילה$i ליה', hebrew: 'פירוש $i'),
+        ],
+      );
+      await repo.ensureAramaicLoaded();
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+      );
+      final context = tester.element(find.byType(SizedBox));
+
+      final children = buildDictionaryContextMenuEntries(
+        context: context,
+        selectedText: 'ליה',
+        repository: repo,
+      ).single.children!;
+
+      // 8 צירופים (התקרה), מפריד, ופעולת פתיחה שמציינת את 4 החתוכים.
+      expect(children, hasLength(10));
+      expect(children.first.isDivider, isFalse);
+      expect(children[8].isDivider, isTrue);
+      expect(children.last.label, 'פתח במילון (עוד 4 צירופים)');
+    });
+
+    testWidgets('התפריט: טקסט מסומן שאינו מפתח מציג צירופים שלמים שבתוכו', (
+      tester,
+    ) async {
+      final repo = DictionaryLookupRepository(
+        loadAramaicEntries: () async => const <AramaicDictionaryEntry>[
+          AramaicDictionaryEntry(aramaic: 'אמר ליה', hebrew: 'אמר לו'),
+          AramaicDictionaryEntry(aramaic: 'ליה רב', hebrew: 'לו רב'),
+        ],
+      );
+      await repo.ensureAramaicLoaded();
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+      );
+      final context = tester.element(find.byType(SizedBox));
+      final opened = <String>[];
+
+      final children = buildDictionaryContextMenuEntries(
+        context: context,
+        selectedText: 'אמר ליה רב',
+        repository: repo,
+        openInDictionaryTool: (_, text) => opened.add(text),
+      ).single.children!;
+
+      expect(children.map((e) => e.isDivider), [false, false, true, false]);
+      expect(children[0].label, startsWith('אמר ליה - '));
+      expect(children[1].label, startsWith('ליה רב - '));
+      children.last.onTap!();
+      expect(opened, ['אמר ליה']); // הצירוף הראשון, לא כל הטקסט שמסומן
+    });
+
+    testWidgets('התפריט: כשהטקסט כולו מפתח, מעדיפים אותו ולא את הצירופים שבתוכו', (
+      tester,
+    ) async {
+      final repo = DictionaryLookupRepository(
+        loadAramaicEntries: () async => const <AramaicDictionaryEntry>[
+          AramaicDictionaryEntry(aramaic: 'אמר ליה', hebrew: 'אמר לו'),
+          AramaicDictionaryEntry(aramaic: 'אמר ליה רב', hebrew: 'אמר לו רב'),
+        ],
+      );
+      await repo.ensureAramaicLoaded();
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+      );
+      final context = tester.element(find.byType(SizedBox));
+
+      final children = buildDictionaryContextMenuEntries(
+        context: context,
+        selectedText: 'אמר ליה רב',
+        repository: repo,
+      ).single.children!;
+
+      expect(children, hasLength(3)); // המפתח, מפריד, פתיחה
+      expect(children.first.label, startsWith('אמר ליה רב - '));
     });
 
     testWidgets('נופל חזרה לחיפוש ארמי כשאין התאמת ראשי תיבות', (tester) async {
@@ -555,6 +682,252 @@ void main() {
             .map((e) => e.aramaic),
         <String>['ליה'],
       );
+    });
+  });
+
+  group('findAramaicMatchGroups', () {
+    late DictionaryLookupRepository repo;
+
+    setUp(() async {
+      repo = DictionaryLookupRepository(
+        loadAramaicEntries: () async => <AramaicDictionaryEntry>[
+          const AramaicDictionaryEntry(aramaic: 'ליה', hebrew: 'לו'),
+          const AramaicDictionaryEntry(aramaic: 'א ב ג ליה', hebrew: 'ארוך'),
+          const AramaicDictionaryEntry(aramaic: 'בעי ליה', hebrew: 'צריך לו'),
+          const AramaicDictionaryEntry(aramaic: 'גמר ליה', hebrew: 'למד לו'),
+          const AramaicDictionaryEntry(aramaic: 'דבר ליה', hebrew: 'אמר לו'),
+        ],
+      );
+      await repo.ensureAramaicLoaded();
+    });
+
+    List<String> keys(List<AramaicDictionaryEntry> entries) => [
+      for (final e in entries) e.aramaic,
+    ];
+
+    test('מפריד התאמה מדויקת מצירופים; בלי תקרה הצירופים בסדר המילון', () {
+      final groups = repo.findAramaicMatchGroups('ליה');
+
+      expect(keys(groups.exact), ['ליה']);
+      expect(keys(groups.containing), [
+        'א ב ג ליה',
+        'בעי ליה',
+        'גמר ליה',
+        'דבר ליה',
+      ]);
+      expect(groups.hiddenContainingKeys, 0);
+    });
+
+    test('עם תקרה הצירופים לפי רלוונטיות (הקצרים קודם), וסופרים את החתוכים', () {
+      final roomy = repo.findAramaicMatchGroups(
+        'ליה',
+        maxContainingMatches: 10,
+      );
+      expect(keys(roomy.containing), [
+        'בעי ליה',
+        'גמר ליה',
+        'דבר ליה',
+        'א ב ג ליה',
+      ]);
+      expect(roomy.hiddenContainingKeys, 0);
+
+      final cut = repo.findAramaicMatchGroups('ליה', maxContainingMatches: 2);
+      expect(keys(cut.containing), ['בעי ליה', 'גמר ליה']);
+      expect(cut.hiddenContainingKeys, 2);
+
+      final none = repo.findAramaicMatchGroups('ליה', maxContainingMatches: 0);
+      expect(none.containing, isEmpty);
+      expect(none.hiddenContainingKeys, 4);
+      expect(keys(none.exact), ['ליה']);
+    });
+
+    test('מילה שאינה במילון מחזירה קבוצות ריקות', () {
+      final groups = repo.findAramaicMatchGroups('זזזזזז');
+
+      expect(groups.exact, isEmpty);
+      expect(groups.containing, isEmpty);
+      expect(groups.hiddenContainingKeys, 0);
+    });
+
+    test('findAramaicMatches הוא החיבור של הקבוצות', () {
+      for (final cap in <int?>[null, 0, 2, 10]) {
+        final groups = repo.findAramaicMatchGroups(
+          'ליה',
+          maxContainingMatches: cap,
+        );
+        expect(
+          keys(repo.findAramaicMatches('ליה', maxContainingMatches: cap)),
+          [...keys(groups.exact), ...keys(groups.containing)],
+          reason: 'תקרה: $cap',
+        );
+      }
+    });
+  });
+
+  group('findAramaicPhrasesWithin', () {
+    const other = 'מילון שיח ישראל';
+    late DictionaryLookupRepository repo;
+
+    setUp(() async {
+      repo = DictionaryLookupRepository(
+        loadAramaicEntries: () async => const <AramaicDictionaryEntry>[
+          AramaicDictionaryEntry(aramaic: 'אמר ליה', hebrew: 'אמר לו'),
+          AramaicDictionaryEntry(aramaic: 'ליה רב', hebrew: 'לו רב'),
+          AramaicDictionaryEntry(aramaic: 'אמר ליה רב', hebrew: 'אמר לו רב'),
+          AramaicDictionaryEntry(
+            aramaic: 'רב אשי',
+            hebrew: 'אשי',
+            dictionary: other,
+          ),
+          AramaicDictionaryEntry(aramaic: 'אמר ליה רב אשי הכל', hebrew: 'ארוך'),
+        ],
+      );
+      await repo.ensureAramaicLoaded();
+    });
+
+    List<String> keys(List<AramaicDictionaryEntry> entries) => [
+      for (final e in entries) e.aramaic,
+    ];
+
+    test('צירופים שלמים בתוך הטקסט, הארוך קודם ובשוויון לפי מיקום', () {
+      expect(
+        keys(
+          repo.findAramaicPhrasesWithin(
+            'אמר ליה רב אשי',
+            dictionaries: {...repo.aramaicDictionaryNames},
+          ),
+        ),
+        ['אמר ליה רב', 'אמר ליה', 'ליה רב', 'רב אשי'],
+      );
+    });
+
+    test('הטקסט כולו אינו נכלל, גם כשהוא עצמו מפתח', () {
+      expect(keys(repo.findAramaicPhrasesWithin('אמר ליה רב')), [
+        'אמר ליה',
+        'ליה רב',
+      ]);
+    });
+
+    test('מילון שאינו נבחר אינו נכלל, וניקוד ופיסוק אינם מפריעים', () {
+      expect(keys(repo.findAramaicPhrasesWithin('אמר ליה רב אשי')), [
+        'אמר ליה רב',
+        'אמר ליה',
+        'ליה רב',
+      ]);
+      expect(keys(repo.findAramaicPhrasesWithin('אָמַר לֵיהּ רַב,')), [
+        'אמר ליה',
+        'ליה רב',
+      ]);
+    });
+
+    test('תקרת צירופים נחתכת לפי הסדר', () {
+      expect(
+        keys(repo.findAramaicPhrasesWithin('אמר ליה רב אשי', maxPhrases: 2)),
+        ['אמר ליה רב', 'אמר ליה'],
+      );
+    });
+
+    test('פחות משלוש מילים, או בלי צירוף במילון, מחזירים ריק', () {
+      expect(repo.findAramaicPhrasesWithin('אמר ליה'), isEmpty);
+      expect(repo.findAramaicPhrasesWithin('אבגד הוזח טיכל'), isEmpty);
+      expect(repo.findAramaicPhrasesWithin(''), isEmpty);
+    });
+
+    test('דיוק: משפט עברי, מילים שאינן סמוכות או בסדר הפוך אינם מתאימים', () {
+      expect(repo.findAramaicPhrasesWithin('הוא אמר לו שלום'), isEmpty);
+      expect(repo.findAramaicPhrasesWithin('אמר מר ליה'), isEmpty);
+      expect(repo.findAramaicPhrasesWithin('רב ליה אמר'), isEmpty);
+    });
+
+    test('דיוק: אין ניחוש קידומת בצירוף, ופיסוק שבתוך הטקסט שובר צירוף', () {
+      // "ואמר ליה" אינו "אמר ליה" עם קידומת; נשאר רק הצירוף שנמצא כלשונו.
+      expect(keys(repo.findAramaicPhrasesWithin('ואמר ליה רב')), ['ליה רב']);
+      // פסיק בין המילים: "אמר," אינה "אמר".
+      expect(keys(repo.findAramaicPhrasesWithin('אמר, ליה רב')), ['ליה רב']);
+    });
+
+    test('דיוק: צירוף בן חמש מילים בתוך משפט ארוך, והוא הראשון', () {
+      expect(
+        keys(
+          repo.findAramaicPhrasesWithin('והוא אמר ליה רב אשי הכל שם'),
+        ).first,
+        'אמר ליה רב אשי הכל',
+      );
+    });
+
+    test('דיוק: מפתח עם כמה משמעויות מוחזר בכולן ומתמזג לכרטיס אחד', () async {
+      final multi = DictionaryLookupRepository(
+        loadAramaicEntries: () async => const <AramaicDictionaryEntry>[
+          AramaicDictionaryEntry(aramaic: 'בר נש', hebrew: 'אדם'),
+          AramaicDictionaryEntry(
+            aramaic: 'בר נש',
+            hebrew: 'בן אנוש',
+            dictionary: other,
+          ),
+        ],
+      );
+      await multi.ensureAramaicLoaded();
+      final found = multi.findAramaicPhrasesWithin(
+        'ההוא בר נש',
+        dictionaries: {...multi.aramaicDictionaryNames},
+      );
+
+      expect(found.map((e) => e.hebrew), ['אדם', 'בן אנוש']);
+      expect(DictionaryLookupRepository.mergeAramaicMatches(found), hasLength(1));
+    });
+
+    test('ביצועים: בחירה של 20,000 מילים אינה מאטה (לא מתחילות בצירוף)', () {
+      final text = List.generate(20000, (i) => 'מילה${i % 50}').join(' ');
+      final stopwatch = Stopwatch()..start();
+      expect(repo.findAramaicPhrasesWithin(text), isEmpty);
+      stopwatch.stop();
+
+      expect(stopwatch.elapsedMilliseconds, lessThan(2000));
+    });
+  });
+
+  group('suggestAramaicBaseWord', () {
+    late DictionaryLookupRepository repo;
+
+    setUp(() async {
+      repo = DictionaryLookupRepository(
+        loadAramaicEntries: () async => const <AramaicDictionaryEntry>[
+          AramaicDictionaryEntry(aramaic: 'אמר', hebrew: 'דיבר'),
+          AramaicDictionaryEntry(aramaic: 'ליה', hebrew: 'לו'),
+          AramaicDictionaryEntry(aramaic: 'בעי ליה', hebrew: 'צריך לו'),
+        ],
+      );
+      await repo.ensureAramaicLoaded();
+    });
+
+    test('קידומת של אות או שתיים ממילה שבמילון', () {
+      expect(repo.suggestAramaicBaseWord('דאמר'), (prefix: 'ד', word: 'אמר'));
+      expect(repo.suggestAramaicBaseWord('ואמר'), (prefix: 'ו', word: 'אמר'));
+      expect(repo.suggestAramaicBaseWord('ודאמר'), (prefix: 'וד', word: 'אמר'));
+      expect(
+        repo.suggestAramaicBaseWord('דָּאָמַר,'),
+        (prefix: 'ד', word: 'אמר'),
+      );
+    });
+
+    test('דיוק: שתי אותיות קידומת רק כשהראשונה ו/ד/ש', () {
+      expect(repo.suggestAramaicBaseWord('ולאמר'), (prefix: 'ול', word: 'אמר'));
+      expect(repo.suggestAramaicBaseWord('שבאמר'), (prefix: 'שב', word: 'אמר'));
+      expect(repo.suggestAramaicBaseWord('דלאמר'), (prefix: 'דל', word: 'אמר'));
+      // רצפים שאינם קידומות: אות ראשונה אחרת
+      expect(repo.suggestAramaicBaseWord('בלאמר'), isNull);
+      expect(repo.suggestAramaicBaseWord('הלאמר'), isNull);
+      expect(repo.suggestAramaicBaseWord('מואמר'), isNull);
+    });
+
+    test('אין הצעה למילה שכבר במילון, לצירוף, או כשאין מילה בסיס', () {
+      expect(repo.suggestAramaicBaseWord('אמר'), isNull);
+      expect(repo.suggestAramaicBaseWord('דבעי'), isNull); // "בעי" רק בתוך צירוף
+      expect(repo.suggestAramaicBaseWord('דאמר ליה'), isNull);
+      expect(repo.suggestAramaicBaseWord('גאמר'), isNull); // ג אינה קידומת נפוצה
+      expect(repo.suggestAramaicBaseWord('ודבאמר'), isNull); // שלוש אותיות
+      expect(repo.suggestAramaicBaseWord('זזזזזז'), isNull);
+      expect(repo.suggestAramaicBaseWord(''), isNull);
     });
   });
 

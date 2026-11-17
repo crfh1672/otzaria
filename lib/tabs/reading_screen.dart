@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart'
     show ValueListenable, visibleForTesting;
 import 'package:flutter/cupertino.dart' show InheritedCupertinoTheme;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:otzaria/core/focus_repository.dart';
@@ -17,6 +16,8 @@ import 'package:otzaria/pdf_book/view/pdf_book_screen.dart';
 import 'package:otzaria/personal_notes/bloc/personal_notes_bloc.dart';
 import 'package:otzaria/plugins/services/plugin_runtime_dispatcher.dart';
 import 'package:otzaria/plugins/services/plugin_text_reader_registry.dart';
+import 'package:otzaria/plugins/services/plugin_webview_focus.dart'
+    show returnKeyboardFromHiddenPluginWebView;
 import 'package:otzaria/tabs/bloc/tabs_bloc.dart';
 import 'package:otzaria/tabs/bloc/tabs_event.dart';
 import 'package:otzaria/tabs/bloc/tabs_state.dart';
@@ -33,14 +34,12 @@ import 'package:otzaria/tabs/models/resolving_tab.dart';
 import 'package:otzaria/tabs/models/tool_tab.dart';
 import 'package:otzaria/tabs/resolving_tab_screen.dart';
 import 'package:otzaria/tools/view/tool_tab_screen.dart';
-import 'package:otzaria/tabs/utils/tab_swipe_direction.dart';
-import 'package:otzaria/tabs/utils/tab_content_vertical_drag_recognizer.dart';
-import 'package:otzaria/tabs/utils/touch_tab_swipe_recognizer.dart';
 import 'package:otzaria/tabs/view/active_pane_marker.dart';
 import 'package:otzaria/tabs/view/pane_drag_handle.dart';
 import 'package:otzaria/tabs/view/pane_drop_geometry.dart';
 import 'package:otzaria/tabs/view/pane_drop_target.dart';
 import 'package:otzaria/tabs/view/split_pane_view.dart';
+import 'package:otzaria/tabs/view/tab_swipe_detector.dart';
 import 'package:otzaria/search/view/tantivy_full_text_search.dart';
 import 'package:otzaria/text_book/bloc/text_book_bloc.dart';
 import 'package:otzaria/text_book/bloc/text_book_event.dart';
@@ -52,6 +51,18 @@ import 'package:otzaria/theme/theme_exports.dart';
 import 'package:otzaria_icons/otzaria_icons.dart';
 import 'package:otzaria/widgets/widgets_exports.dart';
 import 'package:otzaria/tour/tour_target_keys.dart';
+
+/// האם [pane] מציג WebView של תוסף: טאב תוסף או ספר בקורא של תוסף.
+@visibleForTesting
+bool paneShowsPlugin(
+  OpenedTab? pane, [
+  PluginTextReaderRegistry? textReaders,
+]) {
+  if (pane is ToolTab) return pane.isPlugin;
+  if (pane is! TextBookTab) return false;
+  final registry = textReaders ?? PluginTextReaderRegistry.instance;
+  return registry.activePlugin != null && registry.usesPlugin(pane);
+}
 
 class ReadingScreen extends StatefulWidget {
   const ReadingScreen({super.key, this.onFindRefRequested});
@@ -75,18 +86,8 @@ class _ReadingScreenState extends State<ReadingScreen>
   bool _routeWasCurrent = true;
   OpenedTab? _paneBeforeModal;
 
-  /// מהירות שחרור (פיקסלים לוגיים/שנייה) שמעליה ההחלקה נחשבת הנפה
-  /// ומעבירה טאב גם לפני מחצית הדרך.
-  static const double _kTabSwipeFlingVelocity = 250.0;
-
-  /// העמוד (השבור) שבו הייתה התצוגה בתחילת מחוות ההחלקה הנוכחית.
-  double _swipeStartPage = 0;
-
-  /// האם מחוות החלקה גוררת כעת את ה-PageView.
-  bool _swipeDragging = false;
-
-  /// מדכא את [_syncPageController] בזמן אנימציית מעבר מהחלקה, כדי
-  /// ש-jumpToPage של הסנכרון לא יקטע את האנימציה באמצע.
+  /// מדכא את [_syncPageController] בזמן החלקה והתיישבות, כדי
+  /// ש-jumpToPage של הסנכרון לא יקפיץ את התצוגה באמצע.
   bool _suppressPageSync = false;
 
   bool get _isTouchPlatform =>
@@ -242,133 +243,17 @@ class _ReadingScreenState extends State<ReadingScreen>
     });
   }
 
-  /// מזהה החלקה בין טאבים בדסקטופ, בלוח מגע ובמסך מגע.
-  /// הגרירה מזיזה את ה-PageView באופן הדרגתי, ובשחרור מתיישבים על
-  /// הטאב הקרוב (או הסמוך, בהנפה מהירה) — כמו PageScrollPhysics במובייל.
   Widget _wrapWithDesktopTabSwipe(Widget child) {
     if (_isTouchPlatform) return child;
-    return RawGestureDetector(
-      gestures: <Type, GestureRecognizerFactory>{
-        // מעל WebView אין מזהה גלילה פנימי שימנע מעבר טאב בגלילה אנכית.
-        TabContentVerticalDragRecognizer:
-            GestureRecognizerFactoryWithHandlers<
-              TabContentVerticalDragRecognizer
-            >(
-              TabContentVerticalDragRecognizer.new,
-              (recognizer) => recognizer.onStart = (_) {},
-            ),
-        HorizontalDragGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<
-              HorizontalDragGestureRecognizer
-            >(
-              () => HorizontalDragGestureRecognizer(
-                supportedDevices: const {PointerDeviceKind.trackpad},
-              ),
-              _configureTabSwipe,
-            ),
-        TouchTabSwipeRecognizer:
-            GestureRecognizerFactoryWithHandlers<TouchTabSwipeRecognizer>(
-              () => TouchTabSwipeRecognizer(
-                singleFingerPansContent: () {
-                  final tab = context.read<TabsBloc>().state.currentTab;
-                  return tab is PdfBookTab && tab.canPanHorizontally;
-                },
-              ),
-              _configureTabSwipe,
-            ),
+    return TabSwipeDetector(
+      controller: _pageController,
+      onActiveChanged: (active) {
+        _suppressPageSync = active;
+        // משלים שינוי טאב שקרה באמצע ההחלקה ונבלע בדיכוי.
+        if (!active && mounted) _syncPageController();
       },
       child: child,
     );
-  }
-
-  void _configureTabSwipe(HorizontalDragGestureRecognizer recognizer) {
-    recognizer
-      // הזכייה בזירה מגיעה רק אחרי סף — down מוסר את הדלתא
-      // שנצברה עד אז במקום לבלוע אותה (רציפות הגרירה).
-      ..dragStartBehavior = DragStartBehavior.down
-      ..onStart = (_) {
-        final controller = _pageController;
-        if (controller == null || !controller.hasClients) return;
-        _swipeDragging = true;
-        _swipeStartPage = controller.page ?? 0;
-      }
-      ..onUpdate = (details) {
-        final controller = _pageController;
-        if (!_swipeDragging || controller == null || !controller.hasClients) {
-          return;
-        }
-        final position = controller.position;
-        final offsetDelta =
-            details.delta.dx.abs() *
-            tabSwipeDirection(
-              accumulatedDx: details.delta.dx,
-              textDirection: Directionality.of(context),
-            );
-        position.jumpTo(
-          (position.pixels + offsetDelta).clamp(
-            position.minScrollExtent,
-            position.maxScrollExtent,
-          ),
-        );
-      }
-      ..onEnd = (details) {
-        _settleSwipe(details.velocity.pixelsPerSecond.dx);
-      }
-      ..onCancel = () {
-        _settleSwipe(0);
-      };
-  }
-
-  /// משלים מחוות החלקה: מתיישב על הטאב הקרוב למיקום הנוכחי, או על
-  /// הסמוך כשהשחרור היה בהנפה מהירה, ומעדכן את ה-bloc בהתאם.
-  Future<void> _settleSwipe(double velocityDx) async {
-    if (!_swipeDragging) return;
-    _swipeDragging = false;
-    final controller = _pageController;
-    if (controller == null || !controller.hasClients) return;
-    final state = context.read<TabsBloc>().state;
-    if (!state.hasOpenTabs) return;
-    final page = controller.page ?? _swipeStartPage;
-    // המרת מהירות ה-dx למרחב העמודים (אותה המרה כמו לדלתא של הגרירה).
-    final pageVelocity =
-        velocityDx.abs() *
-        tabSwipeDirection(
-          accumulatedDx: velocityDx,
-          textDirection: Directionality.of(context),
-        );
-    int target;
-    if (velocityDx != 0 && pageVelocity.abs() >= _kTabSwipeFlingVelocity) {
-      target = pageVelocity > 0 ? page.floor() + 1 : page.ceil() - 1;
-    } else {
-      target = page.round();
-    }
-    target = target.clamp(0, state.tabs.length - 1);
-    // עדכון ה-bloc קודם כדי שההדגשה בשורת הטאבים תגיב מיד; הסנכרון
-    // (jumpToPage) מדוכא בינתיים כדי שהאנימציה תושלם בלי קטיעה.
-    if (target != state.currentTabIndex) {
-      context.read<TabsBloc>().add(SetCurrentTab(target));
-    }
-    final duration = AppMotion.duration(
-      context,
-      const Duration(milliseconds: 220),
-    );
-    _suppressPageSync = true;
-    try {
-      if (duration == Duration.zero) {
-        controller.jumpToPage(target);
-      } else {
-        await controller.animateToPage(
-          target,
-          duration: duration,
-          curve: Curves.easeOutCubic,
-        );
-      }
-    } finally {
-      _suppressPageSync = false;
-      // השלמת סנכרון לכל שינוי טאב שקרה בזמן האנימציה (למשל לחיצה
-      // בשורת הטאבים) ושנבלע על-ידי הדיכוי.
-      if (mounted) _syncPageController();
-    }
   }
 
   @override
@@ -392,6 +277,16 @@ class _ReadingScreenState extends State<ReadingScreen>
               !identical(previous.currentTab, current.currentTab) ||
               previous.updateCounter != current.updateCounter,
           listener: (context, state) => _syncVisiblePluginTabs(state),
+        ),
+        // בטאב מפוצל התוסף נשאר מוצג, אבל המקלדת שייכת לחלונית הספר (#2945).
+        BlocListener<TabsBloc, TabsState>(
+          listenWhen: (previous, current) =>
+              current.activePane != null &&
+              paneShowsPlugin(previous.activePane) &&
+              !paneShowsPlugin(current.activePane),
+          listener: (context, state) => returnKeyboardFromHiddenPluginWebView(
+            _viewId ?? PluginRuntimeDispatcher.mainViewId,
+          ),
         ),
         BlocListener<TabsBloc, TabsState>(
           listener: (context, state) {
@@ -493,7 +388,7 @@ class _ReadingScreenState extends State<ReadingScreen>
                             key: const ValueKey('normal_tab_view'),
                             controller: _pageController,
                             // בדסקטופ הגלילה מתנגשת בסימון טקסט, ב-PDF
-                            // ובגלגלת; החלקה שם: _wrapWithDesktopTabSwipe.
+                            // ובגלגלת; החלקה שם: TabSwipeDetector.
                             physics: _isTouchPlatform
                                 ? const PageScrollPhysics()
                                 : const NeverScrollableScrollPhysics(),

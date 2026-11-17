@@ -140,6 +140,22 @@ class TextRendererService {
     return processed;
   }
 
+  /// מכין סימוני עילית ותחתית לציור המשותף; [unhighlighted] מכיל אותן תגיות
+  /// sup באותו סדר, לפני הוספת סימוני הדגשה בלבד.
+  static String prepareInlineMarkers(String html, {String? unhighlighted}) {
+    final source = unhighlighted ?? html;
+    if (!identical(html, source) &&
+        _supRegex.allMatches(html).length !=
+            _supRegex.allMatches(source).length) {
+      throw ArgumentError.value(
+        unhighlighted,
+        'unhighlighted',
+        'Superscript mismatch',
+      );
+    }
+    return _fixSubscripts(_fixFootnoteMarkers(html, source));
+  }
+
   // הקומפילציה משותפת לכל השורות כדי להימנע מהקצאה לכל סימון.
   static final RegExp _supRegex = RegExp(
     r'<sup(\s[^>]*)?>(.*?)</sup>',
@@ -154,6 +170,10 @@ class TextRendererService {
   // בלי attributes, או style פשוט בלבד — עיצוב שהציור המורם נושא.
   static final RegExp _plainSupAttrsRegex = RegExp(
     '^\\s*(?:style\\s*=\\s*"($kRaisedSupStylePattern)\\s*")?\\s*\$',
+    caseSensitive: false,
+  );
+  static final RegExp _ownColorRegex = RegExp(
+    r'(?:^|;)\s*color\s*:\s*(?!(?:currentcolor|inherit|unset|revert(?:-layer)?)\b)\S',
     caseSensitive: false,
   );
   static final RegExp _isolateStartRegex = RegExp(r'[\u2066\u2067\u2068]');
@@ -202,8 +222,9 @@ class TextRendererService {
       }
 
       final style = plainAttrs?[1];
-      if (style != null) {
-        // הציור המורם אינו יורש את סגנון אבות ה-HTML; נשאיר אותם במסלול הקיים.
+      if (style != null && !_ownColorRegex.hasMatch(style)) {
+        // הציור המורם יורש גודל ומשקל מהגליף אך לא את צבע האבות; בלי צבע משלו
+        // sup מקונן נשאר במסלול הקיים.
         final offsets = rootSupOffsets ??= html_parser
             .parseFragment(unhighlighted, generateSpans: true)
             .children

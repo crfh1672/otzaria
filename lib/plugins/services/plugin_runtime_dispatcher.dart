@@ -71,6 +71,11 @@ class _QueuedEvent {
   final bool Function()? isCurrent;
 }
 
+class _BootRestoreReason {
+  _BootRestoreReason(this.value);
+  final PluginRestoreReason value;
+}
+
 /// מופע ריצה יחיד של תוסף — כל המצב שהיה מפוזר במפות per-plugin חי כאן.
 class _PluginInstance {
   _PluginInstance({required this.pluginId, required this.instanceId});
@@ -109,7 +114,7 @@ class _PluginInstance {
   int busyCount = 0;
 
   /// סיבת הטעינה הבאה של הדף, עבור `restore` ב-boot.
-  PluginRestoreReason? nextBootReason;
+  _BootRestoreReason? nextBootReason;
 
   /// בקשת פוקוס מקלדת שהגיעה לפני שה-WebView היה מוכן (הטאב נפתח לפני
   /// שנוצר, או שה-resume עוד רץ) — תתבצע ברגע שיהיה.
@@ -159,6 +164,8 @@ class _WindowVisibility {
   bool minimized = false;
 
   bool get isForeground => readerScreenVisible && shown && !minimized;
+
+  bool get showsPlugins => isForeground && visibleKeys.isNotEmpty;
 }
 
 class PluginRuntimeDispatcher {
@@ -751,7 +758,7 @@ class PluginRuntimeDispatcher {
     instance.suspensionState = _PluginSuspensionState.active;
     instance.suspendedAt = null;
     instance.busyCount = 0;
-    instance.nextBootReason = reason;
+    instance.nextBootReason = _BootRestoreReason(reason);
     instance.resetEventOptions();
     instance.clearQueue();
     instance.graceTimer?.cancel();
@@ -786,20 +793,44 @@ class PluginRuntimeDispatcher {
     PluginInstanceId instanceId = PluginInstanceIds.defaultForeground,
     required bool firstBoot,
   }) {
+    final restore = prepareBootRestore(
+      pluginId,
+      instanceId: instanceId,
+      firstBoot: firstBoot,
+    );
+    restore.consume();
+    return restore.payload;
+  }
+
+  /// הכנה אסינכרונית אינה צורכת שחזור; consume נקרא רק לפני שליחת ה-boot.
+  ({Map<String, dynamic>? payload, void Function() consume}) prepareBootRestore(
+    String pluginId, {
+    PluginInstanceId instanceId = PluginInstanceIds.defaultForeground,
+    required bool firstBoot,
+  }) {
     final key = _keyOf(pluginId, instanceId);
     final instance = _instances[key];
+    final pending = instance?.nextBootReason;
     final store = PluginRestoreStateStore.instance;
     // טעינה חוזרת של דף קיים מדווחת תמיד; דף חדש — רק אם נשמר לו מצב.
     final reason =
-        instance?.nextBootReason ??
+        pending?.value ??
         (!firstBoot
             ? PluginRestoreReason.reloaded
             : store.has(key)
             ? PluginRestoreReason.session
             : null);
-    instance?.nextBootReason = null;
-    if (reason == null || instance?.isBackground == true) return null;
-    return {'reason': reason.name, 'state': store.stateOf(key)};
+    return (
+      payload: reason == null || instance?.isBackground == true
+          ? null
+          : {'reason': reason.name, 'state': store.stateOf(key)},
+      consume: () {
+        if (identical(_instances[key], instance) &&
+            identical(instance?.nextBootReason, pending)) {
+          instance?.nextBootReason = null;
+        }
+      },
+    );
   }
 
   /// מעדכן אילו מופעי תוספים מוצגים כעת בטאב העיון הפעיל (ריק = אף אחד)
@@ -807,7 +838,9 @@ class PluginRuntimeDispatcher {
   void setVisiblePluginInstances(Set<PluginInstanceKey> keys, {int? viewId}) {
     final window = _window(viewId);
     if (setEquals(window.visibleKeys, keys)) return;
+    final showedPlugins = window.showsPlugins;
     window.visibleKeys = Set.unmodifiable(keys);
+    _reclaimKeyboardIfPluginsLeft(window, showedPlugins, viewId);
     _scheduleForegroundReconciliation();
   }
 
@@ -815,8 +848,20 @@ class PluginRuntimeDispatcher {
   void setReaderScreenVisible(bool visible, {int? viewId}) {
     final window = _window(viewId);
     if (window.readerScreenVisible == visible) return;
+    final showedPlugins = window.showsPlugins;
     window.readerScreenVisible = visible;
+    _reclaimKeyboardIfPluginsLeft(window, showedPlugins, viewId);
     _scheduleForegroundReconciliation();
+  }
+
+  void _reclaimKeyboardIfPluginsLeft(
+    _WindowVisibility window,
+    bool showedPlugins,
+    int? viewId,
+  ) {
+    if (showedPlugins && !window.showsPlugins) {
+      returnKeyboardFromHiddenPluginWebView(viewId ?? mainViewId);
+    }
   }
 
   /// מעדכן אם החלון עצמו מוצג. חלון שנסגר מוסתר ולא נהרס, ובלי זה
@@ -2154,7 +2199,9 @@ class PluginRuntimeDispatcher {
           // ויירשם למסירה חוזרת — ולא ייבלע ב-eval רגיל על דף באמצע טעינה.
           instance.suspensionState = _PluginSuspensionState.hidden;
           instance.ready = false;
-          instance.nextBootReason = PluginRestoreReason.reloaded;
+          instance.nextBootReason = _BootRestoreReason(
+            PluginRestoreReason.reloaded,
+          );
           try {
             await runtime.reload().timeout(const Duration(seconds: 3));
           } catch (e) {
